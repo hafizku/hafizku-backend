@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+numpy
+faster_whisper
+torch
+dotenv

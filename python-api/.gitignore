@@ -1,0 +1,25 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Python Cache (Sampah kompilasi)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# File Rahasia
+.env
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# Editor Settings
+.vscode/
+.idea/
+
+# Distribution / Build
+dist/
+build/
+*.egg-info/

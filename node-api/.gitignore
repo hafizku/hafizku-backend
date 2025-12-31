@@ -1,0 +1,19 @@
+# Dependency (Sangat berat, jangan di-push)
+node_modules/
+
+# File Rahasia (Berisi password database, API Key, dll)
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor Settings
+.vscode/
+.idea/
+
+# Mac OS System Files
+.DS_Store

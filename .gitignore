@@ -1,0 +1,22 @@
+# Dependency & Virtual Environments
+**/node_modules/
+**/venv/
+**/env/
+
+# Data Database (Sangat Penting!)
+# Jika Anda melakukan mounting volume database ke folder lokal
+postgres_data/
+mongo_data/
+
+# Environment Files (Rahasia)
+.env
+**/.env
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
