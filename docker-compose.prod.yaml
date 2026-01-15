@@ -1,27 +1,27 @@
+version: "3.9"
+
 services:
   node-api:
-    build: ./node-api
+    image: hafizku-node-api:latest
     container_name: hafizku-node-api
-    command: npm run start:dev
+    command: npm run start
     env_file:
       - .env
     depends_on:
       - postgres-db
-    volumes:
-      - ./node-api:/app
-      - /app/node_modules
+    restart: always
     networks:
       - hafizku-net
 
   python-api:
-    build: ./python-api
+    image: hafizku-python-api:latest
     container_name: hafizku-python-api
+    command: python main.py
     env_file:
       - .env
     depends_on:
       - postgres-db
-    volumes:
-      - ./python-api:/app
+    restart: always
     networks:
       - hafizku-net
 
@@ -32,22 +32,23 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5433:5432" # Agar bisa diakses dari aplikasi GUI seperti DBeaver/TablePlus
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: always
     networks:
       - hafizku-net
 
   nginx:
     image: nginx:alpine
+    container_name: hafizku-nginx
     ports:
-      - "8080:80"
+      - "80:80"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - node-api
       - python-api
+    restart: always
     networks:
       - hafizku-net
 
