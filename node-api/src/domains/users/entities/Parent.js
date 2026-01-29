@@ -1,4 +1,4 @@
-class User {
+class Parent {
   constructor(payload) {
     this._verifyPayload(payload);
 
@@ -28,4 +28,4 @@ class User {
   }
 }
 
-module.exports = User;
+module.exports = Parent;

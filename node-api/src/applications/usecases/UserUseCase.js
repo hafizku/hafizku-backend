@@ -1,4 +1,7 @@
+const Child = require("../../domains/users/entities/Child");
 const EditUser = require("../../domains/users/entities/EditUser");
+const Parent = require("../../domains/users/entities/Parent");
+const User = require("../../domains/users/entities/User");
 
 
 class UserUseCase {
@@ -12,7 +15,24 @@ class UserUseCase {
   }
 
   async getUserDetail(userId) {
-    return this._userRepository.getUserDetail(userId);
+    const data = await this._userRepository.getUserDetail(userId);
+    return new User(data);
+  }
+  async getParentDetail(parentId) {
+    const parent = await this._userRepository.getUserDetail(parentId);
+    return new Parent(parent);
+  }
+  async getChildDetail(childId) {
+    const child = await this._userRepository.getUserDetail(childId);
+    let parentName;
+
+    try {
+      parentName = await this._userRepository.getParentName(childId);
+    } catch (error) {
+      parentName = '-';
+    }
+
+    return new Child({ ...child, parent: parentName });
   }
 
   async getAllUser(credentialId) {

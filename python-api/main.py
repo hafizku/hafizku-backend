@@ -112,7 +112,7 @@ class WordAlignmentEngine:
                 events.append({"event": "word_unmatched", "text": p, "expected": expected, "score": score})
         return events
 
-DEFAULT_TARGET = "قالوا سبحانك لا علم لنا الا ما علمتنا انك انت العليم الحكيم"
+DEFAULT_TARGET = "بسم الله الرحمن الرحيم"
 
 # ------------------------------------------------
 # 5) WEBSOCKET SERVER (Updated for Faster-Whisper)
@@ -122,9 +122,49 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     print("📡 Client connected")
 
-    engine = WordAlignmentEngine(DEFAULT_TARGET)
-    await ws.send_json({"event": "init_ok", "target_len": len(engine.target_words)})
+    # Variabel untuk menampung target text
+    current_target_text = DEFAULT_TARGET
+    engine = None
 
+    # engine = WordAlignmentEngine(DEFAULT_TARGET)
+    # await ws.send_json({"event": "init_ok", "target_len": len(engine.target_words)})
+
+    # audio_buffer = np.array([], dtype=np.float32)
+    # loop = asyncio.get_event_loop()
+
+    # --- PHASE 1: INITIALIZATION (Menunggu data ayat dari Client) ---
+    try:
+        # Menunggu pesan pertama yang HARUS berupa JSON berisi konfigurasi
+        # Format JSON yang diharapkan: {"target_text": "Isi ayat quran...", "threshold": 65}
+        init_msg = await ws.receive_json()
+        
+        if "target_text" in init_msg:
+            current_target_text = init_msg["target_text"]
+            # threshold = init_msg.get("threshold", 65.0) # Bisa custom threshold juga
+            
+            print(f"📝 Target set to: {current_target_text[:30]}...")
+            
+            # Inisialisasi Engine dengan teks dari client
+            engine = WordAlignmentEngine(current_target_text)
+            
+            # Kirim konfirmasi ke client bahwa server siap menerima audio
+            await ws.send_json({
+                "event": "init_ok", 
+                "message": "Target text set successfully",
+                "target_len": len(engine.target_words)
+            })
+        else:
+            # Jika format salah
+            await ws.send_json({"event": "error", "message": "Missing 'target_text' in initialization JSON"})
+            await ws.close()
+            return
+
+    except Exception as e:
+        print(f"❌ Error during initialization: {e}")
+        await ws.close()
+        return
+
+    # --- PHASE 2: AUDIO PROCESSING LOOP ---
     audio_buffer = np.array([], dtype=np.float32)
     loop = asyncio.get_event_loop()
 

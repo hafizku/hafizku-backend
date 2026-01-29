@@ -1,4 +1,4 @@
-class EditAyahMemorization {
+class EditVerseMemorization {
   constructor(payload) {
     this._verifyPayload(payload);
 
@@ -21,4 +21,4 @@ class EditAyahMemorization {
   }
 }
 
-module.exports = EditAyahMemorization;
+module.exports = EditVerseMemorization;

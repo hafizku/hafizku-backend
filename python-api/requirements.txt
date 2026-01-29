@@ -4,3 +4,5 @@ numpy
 faster_whisper
 torch
 dotenv
+uvicorn[standard]
+websockets

@@ -10,6 +10,14 @@ class QuranService {
   async getVersesByPage(page) {
     throw new Error('QURAN_SERVICE.METHOD_NOT_IMPLEMENTED');
   }
+
+  async getVerseDetail(page, verseId) {
+    throw new Error('QURAN_SERVICE.METHOD_NOT_IMPLEMENTED');
+  }
+
+  async getChapterById(chapterId) {
+    throw new Error('QURAN_SERVICE.METHOD_NOT_IMPLEMENTED');
+  }
 }
 
 module.exports = QuranService;

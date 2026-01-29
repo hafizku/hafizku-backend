@@ -3,7 +3,7 @@
 exports.shorthands = undefined;
 
 exports.up = (pgm) => {
-  pgm.createTable('ayahmemorizations', {
+  pgm.createTable('versememorizations', {
     id: {
       type: 'VARCHAR(50)',
       primaryKey: true,
@@ -24,7 +24,7 @@ exports.up = (pgm) => {
       type: 'TEXT',
       notNull: true,
     },
-    ayah: {
+    verse: {
       type: 'TEXT',
       notNull: true,
     },
@@ -50,7 +50,7 @@ exports.up = (pgm) => {
     },
   });
 
-  pgm.addConstraint('ayahmemorizations', 'fk_ayahmemorizations.user_id_users.id', 'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE');
+  pgm.addConstraint('versememorizations', 'fk_versememorizations.user_id_users.id', 'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE');
 
   /*
   status:
@@ -61,5 +61,5 @@ exports.up = (pgm) => {
 };
 
 exports.down = (pgm) => {
-  pgm.dropTable('ayahmemorizations');
+  pgm.dropTable('versememorizations');
 };

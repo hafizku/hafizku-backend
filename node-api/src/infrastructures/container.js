@@ -12,7 +12,7 @@ const quran = require('hafizku-quran');
 
 //services
 const UserRepositoryPostgres = require('./repositories/postgres/UserRepositoryPostgres');
-const AyahMemorizationRepositoryPostgres = require('./repositories/postgres/AyahMemorizationRepositoryPostgres');
+const VerseMemorizationRepositoryPostgres = require('./repositories/postgres/VerseMemorizationRepositoryPostgres');
 
 const BcryptPasswordHash = require('./security/BcryptPasswordHash');
 const JwtTokenManager = require('./security/JwtTokenManager');
@@ -23,10 +23,10 @@ const RegisterUseCase = require('../applications/usecases/RegisterUseCase');
 const LoginUseCase = require('../applications/usecases/LoginUseCase');
 const ChangePasswordUseCase = require('../applications/usecases/ChangePasswordUseCase');
 const UserUseCase = require('../applications/usecases/UserUseCase');
-const AyahMemorizationUseCase = require('../applications/usecases/AyahMemorizationUseCase');
+const VerseMemorizationUseCase = require('../applications/usecases/VerseMemorizationUseCase');
 
 const UserRepository = require('../domains/users/UserRepository');
-const AyahMemorizationRepository = require('../domains/ayah_memorizations/AyahMemorizationRepository');
+const VerseMemorizationRepository = require('../domains/verse_memorizations/VerseMemorizationRepository');
 
 const PasswordHash = require('../applications/security/PasswordHash');
 const TokenManager = require('../applications/security/TokenManager');
@@ -88,8 +88,8 @@ container.register([
     }
   },
   {
-    key: AyahMemorizationRepository.name,
-    Class: AyahMemorizationRepositoryPostgres,
+    key: VerseMemorizationRepository.name,
+    Class: VerseMemorizationRepositoryPostgres,
     parameter: {
       dependencies: [
         {
@@ -177,14 +177,14 @@ container.register([
     }
   },
   {
-    key: AyahMemorizationUseCase.name,
-    Class: AyahMemorizationUseCase,
+    key: VerseMemorizationUseCase.name,
+    Class: VerseMemorizationUseCase,
     parameter: {
       injectType: 'destructuring',
       dependencies: [
         {
-          name: 'ayahMemorizationRepository',
-          internal: AyahMemorizationRepository.name,
+          name: 'verseMemorizationRepository',
+          internal: VerseMemorizationRepository.name,
         },
         {
           name: 'quranService',

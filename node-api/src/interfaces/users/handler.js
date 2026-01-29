@@ -8,10 +8,12 @@ class UsersHandler {
     this._container = container;
     this.postLoginHandler = this.postLoginHandler.bind(this);
     this.postRegisterHandler = this.postRegisterHandler.bind(this);
-    this.postChangePasswordHandler = this.postChangePasswordHandler.bind(this);
-    this.editUserHandler = this.editUserHandler.bind(this);
-    this.deleteUserHandler = this.deleteUserHandler.bind(this);
+    //this.postChangePasswordHandler = this.postChangePasswordHandler.bind(this);
+    //this.editUserHandler = this.editUserHandler.bind(this);
+    //this.deleteUserHandler = this.deleteUserHandler.bind(this);
     this.getUserDetailHandler = this.getUserDetailHandler.bind(this);
+    this.getParentsDetailHandler = this.getParentsDetailHandler.bind(this);
+    this.getChildsDetailHandler = this.getChildsDetailHandler.bind(this);
     this.getAllUserHandler = this.getAllUserHandler.bind(this);
     this.postParentLinkHandler = this.postParentLinkHandler.bind(this);
   }
@@ -31,39 +33,69 @@ class UsersHandler {
 
   }
 
-  async editUserHandler(request, h) {
-    const userUseCase = this._container.getInstance(UserUseCase.name);
-    const { id: credentialId } = request.auth.credentials;
-    await userUseCase.editUser(credentialId, request.payload);
+  // async editUserHandler(request, h) {
+  //   const userUseCase = this._container.getInstance(UserUseCase.name);
+  //   const { id: credentialId } = request.auth.credentials;
+  //   await userUseCase.editUser(credentialId, request.payload);
 
-    const response = h.response({
-      status: 'success',
-      message: 'Berhasil Merubah Akun',
-    });
-    response.code(200);
-    return response;
+  //   const response = h.response({
+  //     status: 'success',
+  //     message: 'Berhasil Merubah Akun',
+  //   });
+  //   response.code(200);
+  //   return response;
 
-  }
+  // }
 
-  async deleteUserHandler(request, h) {
-    const userUseCase = this._container.getInstance(UserUseCase.name);
-    const { id: credentialId } = request.auth.credentials;
-    const { userId } = request.params;
-    await userUseCase.deleteUser(userId, credentialId);
+  // async deleteUserHandler(request, h) {
+  //   const userUseCase = this._container.getInstance(UserUseCase.name);
+  //   const { id: credentialId } = request.auth.credentials;
+  //   const { userId } = request.params;
+  //   await userUseCase.deleteUser(userId, credentialId);
 
-    const response = h.response({
-      status: 'success',
-      message: 'Berhasil Menghapus Akun',
-    });
-    response.code(200);
-    return response;
+  //   const response = h.response({
+  //     status: 'success',
+  //     message: 'Berhasil Menghapus Akun',
+  //   });
+  //   response.code(200);
+  //   return response;
 
-  }
+  // }
 
   async getUserDetailHandler(request, h) {
     const userUseCase = this._container.getInstance(UserUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const data = await userUseCase.getUserDetail(credentialId);
+
+    const response = h.response({
+      status: 'success',
+      data
+    });
+
+    response.code(200);
+    return response;
+
+  }
+
+  async getParentsDetailHandler(request, h) {
+    const userUseCase = this._container.getInstance(UserUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const data = await userUseCase.getParentDetail(credentialId);
+
+    const response = h.response({
+      status: 'success',
+      data
+    });
+
+    response.code(200);
+    return response;
+
+  }
+
+  async getChildsDetailHandler(request, h) {
+    const userUseCase = this._container.getInstance(UserUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const data = await userUseCase.getChildDetail(credentialId);
 
     const response = h.response({
       status: 'success',
@@ -90,19 +122,19 @@ class UsersHandler {
 
   }
 
-  async postChangePasswordHandler(request, h) {
-    const { id: credentialId } = request.auth.credentials;
-    const changePasswordUseCase = this._container.getInstance(ChangePasswordUseCase.name);
-    await changePasswordUseCase.execute(credentialId, request.payload);
+  // async postChangePasswordHandler(request, h) {
+  //   const { id: credentialId } = request.auth.credentials;
+  //   const changePasswordUseCase = this._container.getInstance(ChangePasswordUseCase.name);
+  //   await changePasswordUseCase.execute(credentialId, request.payload);
 
-    const response = h.response({
-      status: 'success',
-      message: 'berhasil merubah password',
-    });
-    response.code(200);
-    return response;
+  //   const response = h.response({
+  //     status: 'success',
+  //     message: 'berhasil merubah password',
+  //   });
+  //   response.code(200);
+  //   return response;
 
-  }
+  // }
 
   async postLoginHandler(request, h) {
 

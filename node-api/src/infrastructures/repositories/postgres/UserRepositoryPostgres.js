@@ -3,7 +3,6 @@ const InvariantError = require('../../../commons/exceptions/InvariantError');
 const AuthenticationError = require("../../../commons/exceptions/AuthenticationError");
 const AuthorizationError = require("../../../commons/exceptions/AuthorizationError");
 const NotFoundError = require("../../../commons/exceptions/NotFoundError");
-const User = require("../../../domains/users/entities/User");
 require('dotenv').config();
 
 class UserRepositoryPostgres extends UserRepository {
@@ -38,7 +37,7 @@ class UserRepositoryPostgres extends UserRepository {
       throw new NotFoundError('user tidak ditemukan');
     }
 
-    if (result.rows[0].role !== 'admin' && result.rows[0].role !== 'root') {
+    if (result.rows[0].role !== 'admin') {
       throw new AuthorizationError('Akses ditolak');
     }
   }
@@ -49,6 +48,8 @@ class UserRepositoryPostgres extends UserRepository {
     let roleData = role;
     if (token != null && token != '-' && token == process.env.ADMIN_TOKEN) {
       roleData = 'admin';
+    } else {
+      if (roleData == 'admin') throw new AuthorizationError('Pembuatan akun admin ditolak');
     }
     let tokenParent = '-';
     if (role == 'parent') {
@@ -114,27 +115,42 @@ class UserRepositoryPostgres extends UserRepository {
       throw new NotFoundError('data tidak ditemukan');
     }
 
-    return new User({ ...result.rows[0] });
+    return { ...result.rows[0] };
+
+  }
+
+  async getParentName(id) {
+    const query = {
+      text: 'SELECT u.name FROM users AS u LEFT JOIN parentchilds AS pc ON pc.parent_id = u.id WHERE pc.child_id = $1',
+      values: [id]
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('data tidak ditemukan');
+    }
+
+    return result.rows[0].name;
 
   }
 
   async getAllUser() {
     const query = {
-      text: 'SELECT id, email, password, fullname, role FROM users',
+      text: 'SELECT * FROM users',
       values: []
     };
 
     const result = await this._pool.query(query);
-    const users = [];
-    // eslint-disable-next-line no-plusplus
-    for (let i = 0; i < result.rowCount; i++) {
-      const getUser = new GetUser({
-        ...result.rows[i],
-      });
-      users.push({ ...getUser });
-    }
+    // const users = [];
+    // // eslint-disable-next-line no-plusplus
+    // for (let i = 0; i < result.rowCount; i++) {
+    //   const user = {
+    //     ...result.rows[i],
+    //   };
+    //   users.push({ ...user });
+    // }
 
-    return users;
+    return result.rows;
 
   }
 

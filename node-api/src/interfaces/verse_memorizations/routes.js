@@ -1,16 +1,16 @@
 const routes = (handler) => ([
   {
     method: 'POST',
-    path: '/ayahmemorization',
-    handler: handler.postAyahMemorizationHandler,
+    path: '/versememorization',
+    handler: handler.postVerseMemorizationHandler,
     options: {
       auth: 'hafizku_jwt',
     },
   },
   {
     method: 'PUT',
-    path: '/ayahmemorization/{ayahId}',
-    handler: handler.putAyahMemorizationHandler,
+    path: '/versememorization/{verseId}',
+    handler: handler.putVerseMemorizationHandler,
     options: {
       auth: 'hafizku_jwt',
     },
@@ -35,6 +35,14 @@ const routes = (handler) => ([
     method: 'GET',
     path: '/verses/{pageId}',
     handler: handler.getVersesByPageHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
+    path: '/verses/detail/{pageId}/{verseId}',
+    handler: handler.getVerseDetailHandler,
     options: {
       auth: 'hafizku_jwt',
     },
