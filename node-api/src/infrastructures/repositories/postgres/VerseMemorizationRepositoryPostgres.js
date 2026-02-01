@@ -17,11 +17,13 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
     const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, score',
       values: [id, userId, juz, page, surah, verse, audio, status, score, date, date]
     };
 
-    return this._pool.query(query);
+    const result = await this._pool.query(query);
+
+    return result.rows[0];
   }
 
   async editVerseMemorization(verseId, userId, editVerseMemorization) {
@@ -36,10 +38,10 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
     await this._pool.query(query);
   }
 
-  async getVerseDetailMemorization(userId, verseId) {
+  async getVerseDetailMemorization(userId, verseMemoId) {
     const query = {
-      text: "SELECT id, score, status FROM versememorizations WHERE id = $1 AND user_id = $2",
-      values: [verseId, userId]
+      text: "SELECT id, score, status, audio FROM versememorizations WHERE id = $1 AND user_id = $2",
+      values: [verseMemoId, userId]
     };
 
     const result = await this._pool.query(query);

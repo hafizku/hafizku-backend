@@ -7,7 +7,7 @@ class VerseMemorizationrRepository {
     throw new Error('VERSE_MEMORIZATION_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 
-  async getVerseDetailMemorization(userId, verseId) {
+  async getVerseDetailMemorization(userId, verseMemoId) {
     throw new Error('VERSE_MEMORIZATION_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 

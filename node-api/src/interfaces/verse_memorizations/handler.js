@@ -14,11 +14,12 @@ class VerseMemorizationsHandler {
   async postVerseMemorizationHandler(request, h) {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
-    await verseMemorizationUseCase.addVerseMemorization(credentialId, request.payload);
+    const data = await verseMemorizationUseCase.addVerseMemorization(credentialId, request.payload);
 
     const response = h.response({
       status: 'success',
       message: 'Berhasil menambah hafalan ayat',
+      data
     });
     response.code(201);
     return response;
@@ -49,6 +50,8 @@ class VerseMemorizationsHandler {
       status: 'success',
       message: 'Berhasil menampilkan daftar juz',
       memorized_juz: data.memorized_juz,
+      memorized_verse: data.memorized_verse,
+      total_verse: data.total_verse,
       data: data.merged
     });
     response.code(200);
@@ -66,6 +69,8 @@ class VerseMemorizationsHandler {
       status: 'success',
       message: 'Berhasil menampilkan daftar halaman',
       memorized_page: data.memorized_page,
+      memorized_verse: data.memorized_verse,
+      total_verse: data.total_verse,
       data: data.merged
     });
     response.code(200);
@@ -94,7 +99,8 @@ class VerseMemorizationsHandler {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const { pageId, verseId } = request.params;
-    const data = await verseMemorizationUseCase.getVerseDetailMemorization(credentialId, pageId, verseId);
+    const { verseMemoId } = request.query;
+    const data = await verseMemorizationUseCase.getVerseDetailMemorization(credentialId, pageId, verseId, verseMemoId);
 
     const response = h.response({
       status: 'success',

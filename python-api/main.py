@@ -109,7 +109,7 @@ class WordAlignmentEngine:
                     self.last_sent = idx
                 events.append({"event": "progress", "current_index": self.current_index, "total": len(self.target_words)})
             else:
-                events.append({"event": "word_unmatched", "text": p, "expected": expected, "score": score})
+                events.append({"event": "word_unmatched", "index": self.current_index, "text": p, "expected": expected, "score": score})
         return events
 
 DEFAULT_TARGET = "بسم الله الرحمن الرحيم"

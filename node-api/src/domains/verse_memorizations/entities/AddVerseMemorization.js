@@ -1,5 +1,5 @@
 class AddVerseMemorization {
-  aconstructor(payload) {
+  constructor(payload) {
     this._verifyPayload(payload);
 
 

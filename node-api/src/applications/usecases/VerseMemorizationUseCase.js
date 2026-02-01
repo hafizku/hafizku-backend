@@ -9,25 +9,31 @@ class VerseMemorizationUseCase {
 
   async addVerseMemorization(userId, useCasePayload) {
     const addVerseMemorization = new AddVerseMemorization(useCasePayload);
-    return this._verseMemorizationRepository.addVerseMemorization(userId, addVerseMemorization);
+    const data = await this._verseMemorizationRepository.addVerseMemorization(userId, addVerseMemorization);
+
+    return {
+      id: data.id,
+      score: parseInt(data.score)
+    };
   }
 
-  async editVerseMemorization(verseId, userId, useCasePayload) {
+  async editVerseMemorization(userId, verseId, useCasePayload) {
     const editVerseMemorization = new EditVerseMemorization(useCasePayload);
     return this._verseMemorizationRepository.editVerseMemorization(verseId, userId, editVerseMemorization);
   }
 
-  async getVerseDetailMemorization(userId, page, verseId) {
+  async getVerseDetailMemorization(userId, page, verseId, verseMemoId) {
     const verseDetail = await this._quranService.getVerseDetail(page, verseId);
     const chapterId = verseDetail.key.split(":")[0];
     const chapter = await this._quranService.getChapterById(chapterId);
     let verseDetailHistory;
     try {
-      verseDetailHistory = await this._verseMemorizationRepository.getVerseDetailMemorization(userId, verseId);
+      verseDetailHistory = await this._verseMemorizationRepository.getVerseDetailMemorization(userId, verseMemoId);
     } catch (error) {
       verseDetailHistory = {
         id: null,
         score: null,
+        audio: null,
         status: 'new'
       }
     }
@@ -35,7 +41,12 @@ class VerseMemorizationUseCase {
     return {
       ...verseDetail,
       chapter: chapter.name_simple,
-      progress: verseDetailHistory
+      progress: {
+        id: verseDetailHistory.id,
+        score: parseInt(verseDetailHistory.score),
+        status: verseDetailHistory.status,
+        audio: verseDetailHistory.audio,
+      }
     };
   }
 
@@ -43,15 +54,18 @@ class VerseMemorizationUseCase {
     const verses = await this._quranService.getVersesByPage(page);
     const verseHistory = await this._verseMemorizationRepository.getVerseMemorization(userId, page);
 
+
     const progressMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.score]));
     const idMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.id]));
     const statusMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.status]));
+    const audioMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.audio]));
 
     let totalMemorizedVerse = 0;
 
     const merged = verses.map(verse => {
       const score = progressMap.get(verse.key) || 0;
       const verseId = idMap.get(verse.key) || null;
+      const audio = audioMap.get(verse.key) || '-';
       const statusVerse = statusMap.get(verse.key) || 'new';
 
       if (statusVerse == 'memorized') {
@@ -64,7 +78,8 @@ class VerseMemorizationUseCase {
         progress: {
           id: verseId,
           status: statusVerse,
-          score: score,
+          audio: audio,
+          score: parseInt(score),
         }
       };
     });
@@ -80,9 +95,11 @@ class VerseMemorizationUseCase {
     const juzs = await this._quranService.getAllJuz();
     const juzHistory = await this._verseMemorizationRepository.getJuzMemorization(userId);
 
-    const progressMap = new Map(juzHistory.map(p => [p.juz, p.verses_memorized]));
+    const progressMap = new Map(juzHistory.map(p => [parseInt(p.juz), parseInt(p.verses_memorized)]));
 
     let totalMemorizedJuz = 0;
+    let totalMemorizedVerse = 0;
+    let totalVerses = 0;
 
     const merged = juzs.map(juz => {
       const memorized = progressMap.get(juz.juz_number) || 0;
@@ -101,6 +118,9 @@ class VerseMemorizationUseCase {
         totalMemorizedJuz++;
       }
 
+      totalMemorizedVerse += memorized;
+      totalVerses += total;
+
       return {
         juz: juz.juz_number,
         verses_memorized: memorized,
@@ -112,6 +132,8 @@ class VerseMemorizationUseCase {
 
     return {
       memorized_juz: totalMemorizedJuz,
+      memorized_verse: totalMemorizedVerse,
+      total_verse: totalVerses,
 
       merged: [...merged]
     };
@@ -120,12 +142,16 @@ class VerseMemorizationUseCase {
   async getPageMemorization(userId, juz) {
     const pages = await this._quranService.getPagesByJuz(juz);
     const pagesHistory = await this._verseMemorizationRepository.getPageMemorization(userId, juz);
-    const progressMap = new Map(pagesHistory.map(p => [p.page, p.verses_memorized]));
+
+    const progressMap = new Map(pagesHistory.map(p => [parseInt(p.page), parseInt(p.verses_memorized)]));
 
     let totalMemorizedPage = 0;
+    let totalMemorizedVerse = 0;
+    let totalVerseByJuz = 0;
 
     const merged = pages.map(page => {
       const memorized = progressMap.get(page.id) || 0;
+
       const total = page.total_verses;
 
       let status;
@@ -141,6 +167,9 @@ class VerseMemorizationUseCase {
         totalMemorizedPage++;
       }
 
+      totalMemorizedVerse += memorized;
+      totalVerseByJuz += total;
+
       return {
         page: page.id,
         verses_memorized: memorized,
@@ -153,7 +182,8 @@ class VerseMemorizationUseCase {
 
     return {
       memorized_page: totalMemorizedPage,
-
+      memorized_verse: totalMemorizedVerse,
+      total_verse: totalVerseByJuz,
       merged: [...merged]
     };
   }
