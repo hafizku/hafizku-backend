@@ -9,12 +9,14 @@ class VerseMemorizationsHandler {
     this.getPagesByJuzHandler = this.getPagesByJuzHandler.bind(this);
     this.getVersesByPageHandler = this.getVersesByPageHandler.bind(this);
     this.getVerseDetailHandler = this.getVerseDetailHandler.bind(this);
+    this.getSummaryVerseMemorizationHandler = this.getSummaryVerseMemorizationHandler.bind(this);
   }
 
   async postVerseMemorizationHandler(request, h) {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
-    const data = await verseMemorizationUseCase.addVerseMemorization(credentialId, request.payload);
+    const { verseId } = request.params;
+    const data = await verseMemorizationUseCase.addVerseMemorization(credentialId, verseId, request.payload);
 
     const response = h.response({
       status: 'success',
@@ -107,6 +109,21 @@ class VerseMemorizationsHandler {
       status: 'success',
       message: 'Berhasil menampilkan detail ayat',
       data
+    });
+    response.code(200);
+    return response;
+
+  }
+
+  async getSummaryVerseMemorizationHandler(request, h) {
+    const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const data = await verseMemorizationUseCase.getSummaryVerseMemorization(credentialId);
+
+    const response = h.response({
+      status: 'success',
+      message: 'Berhasil menampilkan hafalan ayat terakhir',
+      ...data
     });
     response.code(200);
     return response;

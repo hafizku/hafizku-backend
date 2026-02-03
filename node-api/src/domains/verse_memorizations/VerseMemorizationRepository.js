@@ -1,5 +1,5 @@
 class VerseMemorizationrRepository {
-  async addVerseMemorization(userId, addVerseMemorization) {
+  async addVerseMemorization(userId, verseId, addVerseMemorization) {
     throw new Error('VERSE_MEMORIZATION_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 
@@ -12,6 +12,10 @@ class VerseMemorizationrRepository {
   }
 
   async getVerseMemorization(userId, page) {
+    throw new Error('VERSE_MEMORIZATION_REPOSITORY.METHOD_NOT_IMPLEMENTED');
+  }
+
+  async getLastVerseMemorization(userId) {
     throw new Error('VERSE_MEMORIZATION_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 

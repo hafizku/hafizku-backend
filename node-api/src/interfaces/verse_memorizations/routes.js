@@ -1,7 +1,7 @@
 const routes = (handler) => ([
   {
     method: 'POST',
-    path: '/versememorization',
+    path: '/versememorization/{verseId}',
     handler: handler.postVerseMemorizationHandler,
     options: {
       auth: 'hafizku_jwt',
@@ -43,6 +43,14 @@ const routes = (handler) => ([
     method: 'GET',
     path: '/verses/detail/{pageId}/{verseId}',
     handler: handler.getVerseDetailHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
+    path: '/versememorization/summary',
+    handler: handler.getSummaryVerseMemorizationHandler,
     options: {
       auth: 'hafizku_jwt',
     },

@@ -7,13 +7,15 @@ class VerseMemorizationUseCase {
     this._quranService = quranService;
   }
 
-  async addVerseMemorization(userId, useCasePayload) {
+  async addVerseMemorization(userId, verseId, useCasePayload) {
     const addVerseMemorization = new AddVerseMemorization(useCasePayload);
-    const data = await this._verseMemorizationRepository.addVerseMemorization(userId, addVerseMemorization);
+    const data = await this._verseMemorizationRepository.addVerseMemorization(userId, verseId, addVerseMemorization);
 
     return {
       id: data.id,
-      score: parseInt(data.score)
+      score: parseInt(data.score),
+      page: data.page,
+      verse_id: data.verse_id
     };
   }
 
@@ -190,6 +192,23 @@ class VerseMemorizationUseCase {
       total_verse: totalVerseByJuz,
       merged: [...merged]
     };
+  }
+
+  async getSummaryVerseMemorization(userId) {
+    let lastVerseMemo;
+    try {
+      lastVerseMemo = await this._verseMemorizationRepository.getLastVerseMemorization(userId);
+    } catch (error) {
+      lastVerseMemo = null;
+    }
+    const memoData = await this.getJuzMemorization(userId);
+
+    return {
+      memorized_juz: memoData.memorized_juz,
+      memorized_verse: memoData.memorized_verse,
+      total_verse: memoData.total_verse,
+      last_verse_memorizing: lastVerseMemo,
+    }
   }
 }
 

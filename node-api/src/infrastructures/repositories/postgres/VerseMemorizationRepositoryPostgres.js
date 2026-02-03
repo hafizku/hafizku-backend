@@ -11,14 +11,14 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
   }
 
 
-  async addVerseMemorization(userId, addVerseMemorization) {
+  async addVerseMemorization(userId, verseId, addVerseMemorization) {
     const { juz, page, surah, verse, audio, status, score } = addVerseMemorization;
     const id = `versememorization-${this._idGenerator()}`;
     const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, score',
-      values: [id, userId, juz, page, surah, verse, audio, status, score, date, date]
+      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, score, page, verse_id',
+      values: [id, userId, juz, page, surah, verse, audio, status, score, date, date, verseId]
     };
 
     const result = await this._pool.query(query);
@@ -60,6 +60,19 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
 
     const result = await this._pool.query(query);
     return result.rows;
+  }
+
+  async getLastVerseMemorization(userId) {
+    const query = {
+      text: "SELECT id, verse, surah, page, juz, score, updated FROM versememorizations WHERE status = 'memorizing' AND user_id = $1 ORDER BY updated DESC",
+      values: [userId]
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('tidak ada ayat yang sedang dihafal');
+    }
+    return result.rows[0];
   }
 
   async getJuzMemorization(userId) {
