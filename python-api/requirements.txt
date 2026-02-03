@@ -6,3 +6,6 @@ torch
 dotenv
 uvicorn[standard]
 websockets
+firebase-admin
+pydub
+boto3

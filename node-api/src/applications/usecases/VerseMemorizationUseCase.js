@@ -19,7 +19,11 @@ class VerseMemorizationUseCase {
 
   async editVerseMemorization(userId, verseId, useCasePayload) {
     const editVerseMemorization = new EditVerseMemorization(useCasePayload);
-    return this._verseMemorizationRepository.editVerseMemorization(verseId, userId, editVerseMemorization);
+    await this._verseMemorizationRepository.editVerseMemorization(verseId, userId, editVerseMemorization);
+    return {
+      id: verseId,
+      score: parseInt(editVerseMemorization.score)
+    };
   }
 
   async getVerseDetailMemorization(userId, page, verseId, verseMemoId) {

@@ -30,11 +30,12 @@ class VerseMemorizationsHandler {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const { verseId } = request.params;
-    await verseMemorizationUseCase.editVerseMemorization(credentialId, verseId, request.payload);
+    const data = await verseMemorizationUseCase.editVerseMemorization(credentialId, verseId, request.payload);
 
     const response = h.response({
       status: 'success',
       message: 'Berhasil mengupdate hafalan ayat',
+      data
     });
     response.code(200);
     return response;

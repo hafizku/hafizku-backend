@@ -5,44 +5,51 @@ import numpy as np
 import logging
 import re
 import difflib
+import io  # <--- Baru: Untuk buffer file
 from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from faster_whisper import WhisperModel  # <--- Pindah ke faster-whisper
+from faster_whisper import WhisperModel
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from huggingface_hub import login
+
+# --- LIBRARY BARU UNTUK SAVE AUDIO ---
+from pydub import AudioSegment
+import logging
 
 app = FastAPI()
 
 load_dotenv()
 
-# Ambil token dari environment variable
-token = os.getenv("HF_TOKEN")
-if token:
-    login(token=token)
+# Konfigurasi logging agar muncul di terminal Docker
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+STORAGE_PATH = "/app/public/recordings"
+# Pastikan folder ada saat aplikasi start
+os.makedirs(STORAGE_PATH, exist_ok=True)
 
 # ------------------------------------------------
 # 1) LOAD FASTER-WHISPER MODEL
 # ------------------------------------------------
-# Menggunakan versi faster-whisper untuk performa maksimal
+token = os.getenv("HF_TOKEN")
+if token:
+    login(token=token)
+
 MODEL_ID = "OdyAsh/faster-whisper-base-ar-quran" 
 
-# Deteksi Device
 import torch
 if torch.cuda.is_available():
     device = "cuda"
-    compute_type = "float16" # Atau "int8_float16" untuk lebih hemat VRAM
-    print("🚀 Menggunakan GPU NVIDIA (CUDA) via Faster-Whisper")
+    compute_type = "float16"
+    logger.info("🚀 Menggunakan GPU NVIDIA (CUDA)")
 else:
     device = "cpu"
     compute_type = "int8"
-    print("🐌 Menggunakan CPU (Optimized with int8)")
+    logger.info("🐌 Menggunakan CPU")
 
-# Inisialisasi Model
-# beam_size dan silero_vad bisa diatur di sini atau saat transcribe
 model = WhisperModel(MODEL_ID, device=device, compute_type=compute_type)
-
-print("✅ Faster-Whisper Model siap digunakan")
+logger.info("✅ Faster-Whisper Model siap")
 
 # ------------------------------------------------
 # 2) AUDIO CONFIG
@@ -54,10 +61,11 @@ WINDOW_SIZE = int(SAMPLE_RATE * WINDOW_SECONDS)
 OVERLAP_SIZE = int(SAMPLE_RATE * OVERLAP_SECONDS)
 SILENCE_THRESHOLD = 0.015
 
-executor = ThreadPoolExecutor(max_workers=4) # Faster-whisper efisien dengan multi-threading
+# Executor untuk AI dan File Processing
+executor = ThreadPoolExecutor(max_workers=4) 
 
 # ------------------------------------------------
-# 3) NORMALIZATION HELPERS (Tetap Sama)
+# 3) HELPER FUNCTIONS
 # ------------------------------------------------
 ARABIC_DIACRITICS = re.compile(r"[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED]")
 
@@ -75,9 +83,6 @@ def tokenize_words(text: str) -> List[str]:
     t = normalize_arabic(text)
     return t.split() if t else []
 
-# ------------------------------------------------
-# 4) WORD ALIGNMENT ENGINE (Tetap Sama)
-# ------------------------------------------------
 class WordAlignmentEngine:
     def __init__(self, target_text: str, match_threshold=65.0):
         self.target_text = target_text
@@ -115,92 +120,139 @@ class WordAlignmentEngine:
 DEFAULT_TARGET = "بسم الله الرحمن الرحيم"
 
 # ------------------------------------------------
-# 5) WEBSOCKET SERVER (Updated for Faster-Whisper)
+# 4) SAVE TO FIREBASE FUNCTION (BARU)
+# ------------------------------------------------
+def process_and_upload_audio(raw_buffer: io.BytesIO, user_id: str, key: str):
+    logger.info(f"DEBUG: Saving to Local Disk for User: {user_id}")
+
+    try:
+        # 1. Siapkan Folder User
+        user_folder = os.path.join(STORAGE_PATH, user_id)
+        os.makedirs(user_folder, exist_ok=True)
+
+        raw_buffer.seek(0) # Reset pointer ke awal
+        # Cek apakah ada data audio
+        data = raw_buffer.read()
+        if len(data) < 1000: # Kalau audio terlalu pendek (< 0.1 detik), skip
+            logger.info("⚠️ Audio terlalu pendek, tidak disimpan.")
+            return
+
+        
+        logger.info(f"💾 Memproses audio untuk User: {user_id}, Key: {key}...")
+        
+        # 1. Load Raw Audio menggunakan Pydub
+        # Asumsi Flutter mengirim: 16kHz, 16-bit (2 bytes), Mono (1 channel)
+        audio_segment = AudioSegment(
+            data=data,
+            sample_width=2, 
+            frame_rate=SAMPLE_RATE, 
+            channels=1
+        )
+
+        # 3. Simpan File (Ganti : jadi _ biar aman)
+        key_safe = key.replace(":", "_")
+        safe_filename = f"{user_id}_{key_safe}.m4a"
+        file_full_path = os.path.join(user_folder, safe_filename)
+        
+        # Export langsung ke file
+        audio_segment.export(file_full_path, format="mp4", bitrate="64k")
+     
+        
+        logger.info(f"✅ File tersimpan di: {file_full_path}")
+        
+        # Return URL (tidak dipakai logic websocket, tapi bagus untuk debug)
+        return f"{safe_filename}"
+
+    except Exception as e:
+        logger.info(f"❌ Gagal Simpan Local: {e}")
+
+# ------------------------------------------------
+# 5) WEBSOCKET SERVER
 # ------------------------------------------------
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    print("📡 Client connected")
+    logger.info("📡 Client connected")
 
-    # Variabel untuk menampung target text
+    # Metadata untuk penyimpanan file
+    meta_user_id = "unknown"
+    meta_key = "0:0"
+
+    should_save = False
+    
     current_target_text = DEFAULT_TARGET
     engine = None
 
-    # engine = WordAlignmentEngine(DEFAULT_TARGET)
-    # await ws.send_json({"event": "init_ok", "target_len": len(engine.target_words)})
-
-    # audio_buffer = np.array([], dtype=np.float32)
-    # loop = asyncio.get_event_loop()
-
-    # --- PHASE 1: INITIALIZATION (Menunggu data ayat dari Client) ---
+    # --- PHASE 1: INITIALIZATION ---
     try:
-        # Menunggu pesan pertama yang HARUS berupa JSON berisi konfigurasi
-        # Format JSON yang diharapkan: {"target_text": "Isi ayat quran...", "threshold": 65}
         init_msg = await ws.receive_json()
         
         if "target_text" in init_msg:
             current_target_text = init_msg["target_text"]
-            # threshold = init_msg.get("threshold", 65.0) # Bisa custom threshold juga
             
-            print(f"📝 Target set to: {current_target_text[:30]}...")
+            # AMBIL METADATA DARI FLUTTER (BARU)
+            meta_user_id = init_msg["user_id"]
+            meta_key = init_msg["key"]
+
+            logger.info(f"📝 Init User: {meta_user_id} | key: {meta_key}")
             
-            # Inisialisasi Engine dengan teks dari client
             engine = WordAlignmentEngine(current_target_text)
             
-            # Kirim konfirmasi ke client bahwa server siap menerima audio
             await ws.send_json({
                 "event": "init_ok", 
-                "message": "Target text set successfully",
+                "message": "Ready to record",
                 "target_len": len(engine.target_words)
             })
         else:
-            # Jika format salah
-            await ws.send_json({"event": "error", "message": "Missing 'target_text' in initialization JSON"})
+            await ws.send_json({"event": "error", "message": "Missing 'target_text'"})
             await ws.close()
             return
 
     except Exception as e:
-        print(f"❌ Error during initialization: {e}")
+        logger.info(f"❌ Error Init: {e}")
         await ws.close()
         return
 
-    # --- PHASE 2: AUDIO PROCESSING LOOP ---
-    audio_buffer = np.array([], dtype=np.float32)
+    # --- PHASE 2: AUDIO LOOP ---
+    
+    # Buffer 1: Untuk AI (Numpy Float32)
+    ai_buffer = np.array([], dtype=np.float32)
+    
+    # Buffer 2: Untuk File Save (BytesIO RAW PCM) <--- BARU
+    full_audio_buffer = io.BytesIO()
+
     loop = asyncio.get_event_loop()
 
     try:
         while True:
             msg = await ws.receive()
+            
+            # Handle Binary Data (Audio Stream)
             if "bytes" in msg:
-                data = msg["bytes"]
-                chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                audio_buffer = np.concatenate((audio_buffer, chunk))
+                raw_bytes = msg["bytes"]
+                
+                # 1. Simpan Raw Bytes untuk file akhir
+                full_audio_buffer.write(raw_bytes) 
+                
+                # 2. Proses untuk AI (Convert ke Float32)
+                chunk = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+                ai_buffer = np.concatenate((ai_buffer, chunk))
 
-                if len(audio_buffer) >= WINDOW_SIZE:
-                    audio_slice = audio_buffer[-WINDOW_SIZE:]
+                # Logic Windowing AI (Sama seperti sebelumnya)
+                if len(ai_buffer) >= WINDOW_SIZE:
+                    audio_slice = ai_buffer[-WINDOW_SIZE:]
                     
-                    # # Simple VAD
-                    # rms = np.sqrt(np.mean(audio_slice**2))
-                    # if rms < SILENCE_THRESHOLD:
-                    #     audio_buffer = audio_buffer[-OVERLAP_SIZE:]
-                    #     continue
-
                     try:
-                        # Fungsi transkripsi untuk executor
                         def transcribe_sync(audio):
-                            # language="ar" mengunci bahasa agar tidak melompat ke bahasa lain
-                            # beam_size=5 meningkatkan akurasi
                             segments, _ = model.transcribe(
                                 audio, 
                                 language="ar", 
                                 beam_size=5,
                                 vad_filter=True,
-                                # vad_parameters=dict(min_silence_duration_ms=1000),
-                                initial_prompt=DEFAULT_TARGET # Memberi konteks Quran
+                                initial_prompt=DEFAULT_TARGET
                             )
                             return "".join([s.text for s in segments]).strip()
 
-                        # Jalankan transkripsi di thread pool agar tidak memblokir websocket
                         text = await loop.run_in_executor(executor, transcribe_sync, audio_slice)
 
                         if text:
@@ -208,13 +260,51 @@ async def websocket_endpoint(ws: WebSocket):
                             for ev in engine.feed(text):
                                 await ws.send_json(ev)
 
-                    except asyncio.TimeoutError:
-                        print("⚠️ Warning: Proses AI terlalu lama (Timeout), skip chunk ini.")
-                        # Jangan di-raise errornya, biarkan loop lanjut
                     except Exception as e:
-                        print(f"⚠️ Transcription Error: {e}")
+                        logger.info(f"⚠️ Transcription Error: {e}")
 
-                    audio_buffer = audio_buffer[-OVERLAP_SIZE:]
+                    ai_buffer = ai_buffer[-OVERLAP_SIZE:]
+            
+            # Handle Text Data (Misal perintah STOP manual)
+            elif "text" in msg:
+                try:
+                    data = json.loads(msg["text"])
+                    
+                    # 2. JIKA MENERIMA SINYAL FINISH
+                    if data.get("event") == "finish":
+                        logger.info(f"🛑 Sinyal FINISH diterima dari {meta_user_id}. Menandai untuk disimpan.")
+                        
+                        # Ubah status jadi BOLEH SIMPAN
+                        should_save = True 
+                        
+                        # Keluar dari loop -> Otomatis masuk ke 'finally'
+                        break 
+                        
+                except Exception:
+                    pass
 
     except WebSocketDisconnect:
-        print("❌ Client Disconnected")
+        logger.info(f"🔌 Client Disconnected ({meta_user_id}) - Saving Audio...")
+                
+    except Exception as e:
+        logger.info(f"❌ Unexpected Error: {e}")
+
+    # --- PERUBAHAN UTAMA DI SINI ---
+    finally:
+        
+        
+        # Cek apakah ada data yang terekam
+        if should_save and full_audio_buffer.getbuffer().nbytes > 0:
+            logger.info(f"🏁 Sesi Berakhir ({meta_user_id}) - Memulai Proses Save...")
+            # Jalankan save di background thread
+            loop.run_in_executor(
+                executor, 
+                process_and_upload_audio, 
+                full_audio_buffer, 
+                meta_user_id, 
+                meta_key
+            )
+        else:
+            # Jika putus koneksi atau buffer kosong
+            logger.info("🗑️ Data audio dibuang (Tidak ada sinyal finish atau buffer kosong).")
+            full_audio_buffer.close() # Bersihkan memori
