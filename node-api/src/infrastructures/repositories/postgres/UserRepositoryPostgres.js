@@ -66,12 +66,12 @@ class UserRepositoryPostgres extends UserRepository {
   }
 
   async editUser(userId, editUser) {
-    const { name, phone, avatar } = editUser;
+    const { name, phone, birthdate, gender } = editUser;
     const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'UPDATE users SET name = $1, phone = $2, avatar = $3, updated = $4 WHERE id = $5',
-      values: [name, phone, avatar, date, userId]
+      text: 'UPDATE users SET name = $1, phone = $2, birth_date = $3, updated = $4, gender = $5 WHERE id = $6',
+      values: [name, phone, birthdate, date, gender, userId]
     };
 
     await this._pool.query(query);
@@ -89,9 +89,15 @@ class UserRepositoryPostgres extends UserRepository {
     await this._pool.query(query);
   }
 
-  async getUserByEmail(email) {
+  async getUserByEmailOrPhone(email) {
+    let queryText;
+    if (email.includes('@')) {
+      queryText = 'SELECT id, email, password, name, role, status, avatar FROM users WHERE email = $1';
+    } else {
+      queryText = 'SELECT id, email, password, name, role, status, avatar FROM users WHERE phone = $1';
+    }
     const query = {
-      text: 'SELECT id, email, password, name, role, status, avatar FROM users WHERE email = $1',
+      text: queryText,
       values: [email]
     };
 
@@ -99,7 +105,7 @@ class UserRepositoryPostgres extends UserRepository {
     if (result.rowCount) {
       return { ...result.rows[0] };
     } else {
-      throw new AuthenticationError('email belum terdaftar');
+      throw new AuthenticationError('email atau nomor hp belum terdaftar');
     }
 
   }

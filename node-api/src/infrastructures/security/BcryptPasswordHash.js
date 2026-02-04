@@ -16,7 +16,7 @@ class BcryptPasswordHash extends PasswordHash {
     const result = await this._bcrypt.compare(plainPassword, encryptedPassword);
 
     if (!result) {
-      throw new AuthenticationError('password salah');
+      throw new AuthenticationError('pin salah');
     }
   }
 }

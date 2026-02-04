@@ -3,7 +3,7 @@ class Child {
     this._verifyPayload(payload);
 
 
-    const { id, email, name, phone, avatar, status, created, updated, role, parent } = payload;
+    const { id, email, name, phone, avatar, status, created, updated, role, parent, birth_date, gender } = payload;
 
     this.id = id;
     this.email = email;
@@ -15,6 +15,8 @@ class Child {
     this.created = created;
     this.updated = updated;
     this.parent = parent;
+    this.birth_date = birth_date;
+    this.gender = gender;
   }
 
   _verifyPayload({ id, email, name, role, phone, avatar, status, created, updated, parent }) {

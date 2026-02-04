@@ -23,7 +23,7 @@ class UserRepository {
     throw new Error('USER_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 
-  async getUserByEmail(email) {
+  async getUserByEmailOrPhone(email) {
     throw new Error('USER_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 

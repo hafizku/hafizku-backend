@@ -11,7 +11,7 @@ class LoginUseCase {
 
   async execute(useCasePayload) {
     const loginUser = new LoginUser(useCasePayload);
-    const { id, email, password, name, role, status, avatar } = await this._userRepository.getUserByEmail(loginUser.email);
+    const { id, email, password, name, role, status, avatar } = await this._userRepository.getUserByEmailOrPhone(loginUser.email);
     await this._passwordHash.comparePassword(loginUser.password, password);
     const accessToken = await this._tokenManager.createAccessToken({ id, email });
     const loggedUser = new LoggedUser({
