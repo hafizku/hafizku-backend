@@ -3,7 +3,7 @@ class Parent {
     this._verifyPayload(payload);
 
 
-    const { id, email, name, phone, avatar, status, created, updated, role, token } = payload;
+    const { id, email, name, phone, avatar, status, created, updated, role, token, birth_date, gender } = payload;
 
     this.id = id;
     this.email = email;
@@ -15,6 +15,8 @@ class Parent {
     this.created = created;
     this.updated = updated;
     this.token = token;
+    this.birth_date = birth_date;
+    this.gender = gender;
   }
 
   _verifyPayload({ id, email, name, role, phone, avatar, status, created, updated, token }) {

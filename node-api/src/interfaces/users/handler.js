@@ -129,7 +129,7 @@ class UsersHandler {
 
     const response = h.response({
       status: 'success',
-      message: 'berhasil merubah password',
+      message: 'berhasil merubah pin',
     });
     response.code(200);
     return response;
