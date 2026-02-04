@@ -66,12 +66,12 @@ class UserRepositoryPostgres extends UserRepository {
   }
 
   async editUser(userId, editUser) {
-    const { name, phone, birthdate, gender } = editUser;
+    const { name, phone, birthdate, gender, avatar } = editUser;
     const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'UPDATE users SET name = $1, phone = $2, birth_date = $3, updated = $4, gender = $5 WHERE id = $6',
-      values: [name, phone, birthdate, date, gender, userId]
+      text: 'UPDATE users SET name = $1, phone = $2, birth_date = $3, updated = $4, gender = $5, avatar = $6 WHERE id = $7',
+      values: [name, phone, birthdate, date, gender, avatar, userId]
     };
 
     await this._pool.query(query);
