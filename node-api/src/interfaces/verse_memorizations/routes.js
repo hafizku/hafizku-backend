@@ -25,6 +25,14 @@ const routes = (handler) => ([
   },
   {
     method: 'GET',
+    path: '/juzs/parent/{childId}',
+    handler: handler.getAllJuzChildHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
     path: '/pages/{juzId}',
     handler: handler.getPagesByJuzHandler,
     options: {
@@ -33,8 +41,24 @@ const routes = (handler) => ([
   },
   {
     method: 'GET',
+    path: '/pages/parent/{childId}/{juzId}',
+    handler: handler.getPagesByJuzChildHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
     path: '/verses/{pageId}',
     handler: handler.getVersesByPageHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
+    path: '/verses/parent/{childId}/{pageId}',
+    handler: handler.getVersesByPageChildHandler,
     options: {
       auth: 'hafizku_jwt',
     },
@@ -51,6 +75,14 @@ const routes = (handler) => ([
     method: 'GET',
     path: '/versememorization/summary',
     handler: handler.getSummaryVerseMemorizationHandler,
+    options: {
+      auth: 'hafizku_jwt',
+    },
+  },
+  {
+    method: 'GET',
+    path: '/childs/summary',
+    handler: handler.getChildsSummaryHandler,
     options: {
       auth: 'hafizku_jwt',
     },

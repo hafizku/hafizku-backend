@@ -54,7 +54,7 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
 
   async getVerseMemorization(userId, page) {
     const query = {
-      text: "SELECT id, verse, surah, juz, score, status, updated FROM versememorizations WHERE page = $1 AND user_id = $2",
+      text: "SELECT id, verse, surah, juz, score, status, audio, updated FROM versememorizations WHERE page = $1 AND user_id = $2",
       values: [page, userId]
     };
 

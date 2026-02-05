@@ -5,8 +5,9 @@ const User = require("../../domains/users/entities/User");
 
 
 class UserUseCase {
-  constructor({ userRepository }) {
+  constructor({ userRepository, verseMemorizationRepository }) {
     this._userRepository = userRepository;
+    this._verseMemorizationRepository = verseMemorizationRepository;
   }
 
   async editUser(userId, useCasePayload) {
@@ -50,6 +51,8 @@ class UserUseCase {
     await this._userRepository.checkParentChild(userId, parentId);
     return this._userRepository.parentLink(userId, parentId);
   }
+
+
 }
 
 module.exports = UserUseCase;

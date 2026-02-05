@@ -16,6 +16,7 @@ class UsersHandler {
     this.getChildsDetailHandler = this.getChildsDetailHandler.bind(this);
     this.getAllUserHandler = this.getAllUserHandler.bind(this);
     this.postParentLinkHandler = this.postParentLinkHandler.bind(this);
+
   }
 
   async postRegisterHandler(request, h) {
@@ -166,6 +167,8 @@ class UsersHandler {
     return response;
 
   }
+
+
 }
 
 module.exports = UsersHandler;

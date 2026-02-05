@@ -72,7 +72,7 @@ const routes = (handler) => ([
     options: {
       auth: 'hafizku_jwt',
     },
-  },
+  }
 ]);
 
 module.exports = routes;

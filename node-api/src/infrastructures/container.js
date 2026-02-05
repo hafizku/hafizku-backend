@@ -172,7 +172,11 @@ container.register([
         {
           name: 'userRepository',
           internal: UserRepository.name,
-        }
+        },
+        {
+          name: 'verseMemorizationRepository',
+          internal: VerseMemorizationRepository.name,
+        },
       ]
     }
   },
@@ -189,7 +193,11 @@ container.register([
         {
           name: 'quranService',
           internal: QuranService.name,
-        }
+        },
+        {
+          name: 'userRepository',
+          internal: UserRepository.name,
+        },
       ]
     }
   }

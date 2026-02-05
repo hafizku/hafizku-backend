@@ -10,6 +10,10 @@ class VerseMemorizationsHandler {
     this.getVersesByPageHandler = this.getVersesByPageHandler.bind(this);
     this.getVerseDetailHandler = this.getVerseDetailHandler.bind(this);
     this.getSummaryVerseMemorizationHandler = this.getSummaryVerseMemorizationHandler.bind(this);
+    this.getChildsSummaryHandler = this.getChildsSummaryHandler.bind(this);
+    this.getAllJuzChildHandler = this.getAllJuzChildHandler.bind(this);
+    this.getPagesByJuzChildHandler = this.getPagesByJuzChildHandler.bind(this);
+    this.getVersesByPageChildHandler = this.getVersesByPageChildHandler.bind(this);
   }
 
   async postVerseMemorizationHandler(request, h) {
@@ -62,6 +66,25 @@ class VerseMemorizationsHandler {
 
   }
 
+  async getAllJuzChildHandler(request, h) {
+    const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const { childId } = request.params;
+    const data = await verseMemorizationUseCase.getJuzChildMemorization(credentialId, childId);
+
+    const response = h.response({
+      status: 'success',
+      message: 'Berhasil menampilkan daftar hafalan juz anak',
+      memorized_juz: data.memorized_juz,
+      memorized_verse: data.memorized_verse,
+      total_verse: data.total_verse,
+      data: data.merged
+    });
+    response.code(200);
+    return response;
+
+  }
+
   async getPagesByJuzHandler(request, h) {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
@@ -81,6 +104,25 @@ class VerseMemorizationsHandler {
 
   }
 
+  async getPagesByJuzChildHandler(request, h) {
+    const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const { childId, juzId } = request.params;
+    const data = await verseMemorizationUseCase.getPageChildMemorization(credentialId, childId, juzId);
+
+    const response = h.response({
+      status: 'success',
+      message: 'Berhasil menampilkan daftar halaman anak',
+      memorized_page: data.memorized_page,
+      memorized_verse: data.memorized_verse,
+      total_verse: data.total_verse,
+      data: data.merged
+    });
+    response.code(200);
+    return response;
+
+  }
+
   async getVersesByPageHandler(request, h) {
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
@@ -90,6 +132,23 @@ class VerseMemorizationsHandler {
     const response = h.response({
       status: 'success',
       message: 'Berhasil menampilkan daftar ayat',
+      memorized_verse: data.memorized_verse,
+      data: data.merged
+    });
+    response.code(200);
+    return response;
+
+  }
+
+  async getVersesByPageChildHandler(request, h) {
+    const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
+    const { id: credentialId } = request.auth.credentials;
+    const { childId, pageId } = request.params;
+    const data = await verseMemorizationUseCase.getVerseChildMemorization(credentialId, childId, pageId);
+
+    const response = h.response({
+      status: 'success',
+      message: 'Berhasil menampilkan daftar ayat anak',
       memorized_verse: data.memorized_verse,
       data: data.merged
     });
@@ -125,6 +184,21 @@ class VerseMemorizationsHandler {
       message: 'Berhasil menampilkan hafalan ayat terakhir',
       ...data
     });
+    response.code(200);
+    return response;
+
+  }
+
+  async getChildsSummaryHandler(request, h) {
+    const { id: credentialId } = request.auth.credentials;
+    const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
+    const data = await verseMemorizationUseCase.getChildSummary(credentialId);
+    const response = h.response({
+      status: 'success',
+      message: 'Berhasil mendapatkan data summary anak',
+      data
+    });
+
     response.code(200);
     return response;
 

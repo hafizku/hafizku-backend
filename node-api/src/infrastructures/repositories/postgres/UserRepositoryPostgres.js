@@ -212,6 +212,30 @@ class UserRepositoryPostgres extends UserRepository {
     }
   }
 
+  async verifyParentChild(parentId, childId) {
+    const query = {
+      text: 'SELECT id FROM parentchilds WHERE parent_id = $1 AND child_id = $2',
+      values: [parentId, childId]
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new AuthorizationError('Akses ditolak');
+    }
+  }
+
+  async getListChild(parentId) {
+    const query = {
+      text: "SELECT u.id, u.name, u.avatar, ROUND(AVG(CAST(NULLIF(regexp_replace(vm.score, '[^0-9.]', '', 'g'), '') AS NUMERIC)), 0) AS total_score FROM users u JOIN parentchilds pc ON u.id = pc.child_id JOIN versememorizations vm ON vm.user_id = u.id WHERE vm.status = 'memorized' AND pc.parent_id = $1 GROUP BY u.id, u.name",
+      values: [parentId]
+    };
+
+    const result = await this._pool.query(query);
+
+    return result.rows;
+  }
+
 
 }
 
