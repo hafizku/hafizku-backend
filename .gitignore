@@ -7,7 +7,7 @@
 # Jika Anda melakukan mounting volume database ke folder lokal
 postgres_data/
 mongo_data/
-hafizku_media/
+hafizku-media/
 
 # Environment Files (Rahasia)
 .env

@@ -22,7 +22,7 @@ services:
       - postgres-db
     volumes:
       - ./python-api:/app
-      - ./hafizku_media:/app/public/recordings
+      - ./hafizku-media:/app/public/recordings
     networks:
       - hafizku-net
 
@@ -46,7 +46,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./hafizku_media:/var/www/html/recordings
+      - ./hafizku-media:/var/www/html/recordings
     depends_on:
       - node-api
       - python-api
