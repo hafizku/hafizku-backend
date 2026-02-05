@@ -1,6 +1,6 @@
 services:
   node-api:
-    image: ghcr.io/username/node-api:latest # Menggunakan image dari GHCR
+    image: ghcr.io/hafizku/node-api:latest # Menggunakan image dari GHCR
     container_name: hafizku-node-api
     restart: always # Penting agar container nyala otomatis jika server restart
     command: npm run start # Menggunakan mode production
@@ -15,7 +15,7 @@ services:
       - hafizku-net
 
   python-api:
-    image: ghcr.io/username/python-api:latest
+    image: ghcr.io/hafizku/python-api:latest
     container_name: hafizku-python-api
     restart: always
     env_file:
