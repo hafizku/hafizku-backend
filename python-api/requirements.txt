@@ -1,11 +1,19 @@
+# fastapi
+# uvicorn
+# numpy
+# faster_whisper
+# torch
+# dotenv
+# uvicorn[standard]
+# websockets
+# pydub
+
 fastapi
-uvicorn
-numpy
-faster_whisper
-torch
-dotenv
 uvicorn[standard]
+numpy<2.0.0
+faster_whisper
+huggingface_hub
+python-dotenv
 websockets
-firebase-admin
 pydub
-boto3
+torch --index-url https://download.pytorch.org/whl/cpu

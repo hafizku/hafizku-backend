@@ -1,10 +1,25 @@
-__pycache__
+# __pycache__
+# *.pyc
+# *.pyo
+# *.pyd
+# .Python
+# env
+# venv
+# .env
+# .git
+# .gitignore
+
+
+
+__pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-env
-venv
 .env
 .git
-.gitignore
+.venv
+node_modules/
+serviceAccountKey.json
+.cache/
+models/
+public/recordings/
+*.m4a
+*.wav
