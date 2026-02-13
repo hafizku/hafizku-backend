@@ -354,3 +354,5 @@ async def websocket_endpoint(ws: WebSocket):
             # Jika putus koneksi atau buffer kosong
             logger.info("🗑️ Data audio dibuang (Tidak ada sinyal finish atau buffer kosong).")
             full_audio_buffer.close() # Bersihkan memori
+
+#ganti jadi surah-splitter
