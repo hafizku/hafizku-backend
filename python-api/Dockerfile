@@ -14,10 +14,10 @@
 
 
 # Definisikan platform default jika tidak diisi
-# ARG PLATFORM=linux/amd64
-# FROM --platform=${PLATFORM} python:3.11-slim
+ARG PLATFORM=linux/amd64
+FROM --platform=${PLATFORM} python:3.11-slim
 
-FROM python:3.11-slim
+# FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -37,7 +37,7 @@ COPY requirements.txt .
 # 4. Install sisa dependensi
 RUN pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir "numpy<2.0.0" && \
-  pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+  # pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
   pip install --no-cache-dir -r requirements.txt
 
 # Copy seluruh source code
