@@ -1,19 +1,18 @@
-# fastapi
-# uvicorn
-# numpy
-# faster_whisper
-# torch
-# dotenv
-# uvicorn[standard]
-# websockets
-# pydub
-
 fastapi
-uvicorn[standard]
-numpy<2.0.0
-faster_whisper
-huggingface_hub
-python-dotenv
+uvicorn
+python-multipart
 websockets
+# Library Text Matching
+thefuzz
+python-Levenshtein
+# Library Surah Splitter
 pydub
-# torch --index-url https://download.pytorch.org/whl/cpu
+loguru
+rich
+cyclopts
+whisperx>=3.4.2
+# Dependensi AI (CPU)
+torch --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+faster-whisper
+numpy

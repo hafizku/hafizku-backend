@@ -16,28 +16,37 @@ services:
   python-api:
     build:
       context: ./python-api
-      args:
-        - PLATFORM=linux/arm64
     container_name: hafizku-python-api
+    # Agar jika crash karena RAM penuh (OOM), dia auto restart
+    restart: unless-stopped
     env_file:
       - .env
     depends_on:
       - postgres-db
     volumes:
-      - ./python-api:/app
+      # CATATAN KRUSIAL (Lihat Penjelasan No. 3 di bawah):
+      # Mounting ini berisiko jika folder 'surah-splitter' tidak ada di host.
+      # Untuk production VPS, disarankan baris mount '/app' ini DIKOMENTAR/HAPUS.
+      # - ./python-api:/app 
+
+      # Mapping folder rekaman
       - ./hafizku-media:/app/public/recordings
+
+      # OPTIMASI: Cache Model AI (Whisper) agar tidak download ulang setiap restart container
+      - huggingface_cache:/app/cache
     networks:
       - hafizku-net
 
   postgres-db:
     image: postgres:15-alpine
     container_name: hafizku-postgres
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5433:5432" # Agar bisa diakses dari aplikasi GUI seperti DBeaver/TablePlus
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -61,4 +70,6 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  postgres_data: # Volume baru untuk menyimpan model AI
+
+  huggingface_cache:

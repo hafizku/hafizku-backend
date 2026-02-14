@@ -1,25 +1,45 @@
-# __pycache__
-# *.pyc
-# *.pyo
-# *.pyd
-# .Python
-# env
-# venv
-# .env
-# .git
-# .gitignore
-
-
-
+# --- Python & System ---
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+
+# --- Git & Config ---
 .git
-.venv
-node_modules/
+.gitignore
+.dockerignore
+.env
+.env.*
 serviceAccountKey.json
-.cache/
-models/
+
+# --- Dependencies & Virtual Envs ---
+.venv
+venv/
+env/
+node_modules/
+
+# --- Temporary Files (PENTING: Agar file sampah tidak ikut ke dalam Docker) ---
+# Folder temp yang dibuat oleh script main.py tadi
+temp_hafalan/
+temp_data/
+temp_files/
+
+# --- Media Files ---
+# Agar rekaman testing lokal tidak memenuhi image docker
 public/recordings/
 *.m4a
 *.wav
+*.mp3
+*.webm
+
+# --- AI & Cache ---
+# Jangan copy model yang didownload di laptop lokal (biarkan Docker download sendiri/mount volume)
+.cache/
+models/
+hf_cache/
+
+# --- Surah Splitter Cleanup ---
+# Kita butuh codenya, tapi tidak butuh history git atau cachenya
+surah-splitter/.git
+surah-splitter/__pycache__
+surah-splitter/.venv

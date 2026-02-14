@@ -1,358 +1,259 @@
+import sys
 import os
-import asyncio
+import shutil
 import json
-import numpy as np
-import logging
-import re
-import difflib
-import io
-import multiprocessing
-from typing import List
+import asyncio
+import wave  # <--- TAMBAHKAN INI
+from pathlib import Path
+from contextlib import asynccontextmanager
+from typing import List, Optional
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from faster_whisper import WhisperModel
-from concurrent.futures import ThreadPoolExecutor
-from dotenv import load_dotenv
-from huggingface_hub import login
-# import torch
-from pydub import AudioSegment
-import logging
+from fastapi.middleware.cors import CORSMiddleware
+from thefuzz import fuzz 
 
-app = FastAPI()
+# --- 1. SETUP PATH IMPORT SURAH SPLITTER ---
+# Mengarahkan python path ke folder src repo surah-splitter
+current_dir = Path(__file__).parent
+surah_splitter_src = current_dir / "surah_splitter"
+sys.path.append(str(surah_splitter_src))
 
-load_dotenv()
+# =================================================================
+# --- HOTFIX: PERBAIKAN PATH DATA QURAN ---
+# Kita cegah error FileNotFoundError dengan memaksa path /data/ 
+# mengarah ke folder yang benar di dalam proyek kita.
+try:
+    import surah_splitter.utils.paths as ss_paths
+    # Paksa path mengarah ke /app/surah-splitter/data/quran_metadata
+    correct_data_path = current_dir / "data" / "quran_metadata"
+    ss_paths.QURAN_METADATA_PATH = correct_data_path
+except ImportError:
+    pass
+# =================================================================
 
-# Konfigurasi logging agar muncul di terminal Docker
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger(__name__)
-# logging.getLogger("faster_whisper").setLevel(logging.DEBUG)
+try:
+    # Kita import Service yang sudah ada di repo OdyAsh
+    from surah_splitter.services.transcription_service import TranscriptionService
+    from surah_splitter.services.quran_metadata_service import QuranMetadataService
+    # Kita gunakan logger bawaan repo agar format log konsisten
+    from surah_splitter.utils.app_logger import logger
+except ImportError as e:
+    print(f"CRITICAL ERROR: Gagal import modul surah_splitter. {e}")
+    sys.exit(1)
 
-STORAGE_PATH = "/app/public/recordings"
+# --- 2. CONFIG CPU VPS ---
+# Gunakan model 'tiny' agar real-time di CPU. 
+# Model default repo ini 'base', itu terlalu berat untuk real-time stream di CPU.
+MODEL_NAME = "tiny" 
+DEVICE = "cpu"
+COMPUTE_TYPE = "int8"
 
-os.makedirs(STORAGE_PATH, exist_ok=True)
+# --- 3. CLASS LOGIKA HAFALAN (SESSION MANAGER) ---
+class HafalanSession:
+    """
+    Mengatur logika pencocokan kata per kata untuk satu sesi user.
+    """
+    def __init__(self, target_text: str, quran_service: QuranMetadataService):
+        self.quran_service = quran_service
+        # Gunakan fungsi clean_text dari QuranMetadataService agar standar text-nya sama
+        # Fungsi ini mengembalikan List[str], misal: ['بسم', 'الله', ...]
+        self.target_words = self.quran_service._clean_text(target_text)
+        self.current_index = 0 # Kata ke berapa yang sedang ditunggu
+        self.revealed_indices = []
 
-# ------------------------------------------------
-# 1) LOAD FASTER-WHISPER MODEL
-# ------------------------------------------------
-token = os.getenv("HF_TOKEN")
-if token:
-    login(token=token)
+    def process_transcription(self, transcribed_text: str) -> List[int]:
+        """
+        Mencocokkan transkripsi user dengan kata target selanjutnya.
+        Return: List index kata yang berhasil ditebak (untuk di-reveal di Flutter).
+        """
+        if not transcribed_text:
+            return []
+        
+        # Bersihkan input user dengan standar yang sama
+        user_words = self.quran_service._clean_text(transcribed_text)
+        new_matches = []
+        
+        # Logika Greedy Forward Matching
+        # Kita cek kata-kata dari user, apakah cocok dengan kata target saat ini?
+        for u_word in user_words:
+            if self.current_index >= len(self.target_words):
+                break # Ayat sudah selesai
 
-MODEL_ID = "OdyAsh/faster-whisper-base-ar-quran" 
-
-# Deteksi Core: Di VPS kecil, jangan gunakan semua core untuk AI
-# Sisakan resource untuk menghandle WebSocket
-total_cores = multiprocessing.cpu_count()
-ai_threads = max(1, total_cores - 1) if total_cores > 2 else total_cores
-# Intra-op threads untuk komputasi matriks
-os.environ["OMP_NUM_THREADS"] = str(ai_threads) 
-
-logger.info(f"⚙️ Config: Detected {total_cores} Cores. Using {ai_threads} threads for AI.")
-
-
-# if torch.cuda.is_available():
-#     device = "cuda"
-#     compute_type = "float16"
-#     logger.info("🚀 Menggunakan GPU NVIDIA (CUDA)")
-# else:
-#     device = "cpu"
-#     compute_type = "int8"
-#     logger.info("🐌 Menggunakan CPU")
-
-device = "cpu"
-compute_type = "int8" # Wajib int8 untuk CPU VPS
-
-
-model = WhisperModel(MODEL_ID, device=device, compute_type=compute_type,cpu_threads=ai_threads,num_workers=1)
-# logger.info("✅ Faster-Whisper Model siap")
-logger.info("✅ Faster-Whisper Model siap (Optimized for CPU)")
-
-# ------------------------------------------------
-# 2) AUDIO CONFIG
-# ------------------------------------------------
-SAMPLE_RATE = 16000
-WINDOW_SECONDS = 1.6
-OVERLAP_SECONDS = 0.6
-
-# OPTIMASI 1: Perbesar Window. 
-# Jangan 1.6s. Gunakan 3-4 detik agar CPU punya napas.
-# WINDOW_SECONDS = 3.0 
-# # Overlap secukupnya agar kata tidak terpotong
-# OVERLAP_SECONDS = 1.0
-WINDOW_SIZE = int(SAMPLE_RATE * WINDOW_SECONDS)
-OVERLAP_SIZE = int(SAMPLE_RATE * OVERLAP_SECONDS)
-SILENCE_THRESHOLD = 0.015
-
-# Executor untuk AI dan File Processing
-# executor = ThreadPoolExecutor(max_workers=4) 
-executor = ThreadPoolExecutor(max_workers=1) 
-
-# ------------------------------------------------
-# 3) HELPER FUNCTIONS
-# ------------------------------------------------
-ARABIC_DIACRITICS = re.compile(r"[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED]")
-
-def normalize_arabic(text: str) -> str:
-    text = text.strip()
-    text = ARABIC_DIACRITICS.sub("", text)
-    text = re.sub("[إأٱآا]", "ا", text)
-    text = re.sub("[ؤ]", "و", text)
-    text = re.sub("[ئ]", "ي", text)
-    text = re.sub("ة", "ه", text)
-    text = re.sub("[^\u0600-\u06FF\s]", " ", text)
-    return re.sub("\s+", " ", text).strip()
-
-def tokenize_words(text: str) -> List[str]:
-    t = normalize_arabic(text)
-    return t.split() if t else []
-
-class WordAlignmentEngine:
-    def __init__(self, target_text: str, match_threshold=65.0):
-        self.target_text = target_text
-        self.target_words = tokenize_words(target_text)
-        self.match_threshold = match_threshold
-        self.current_index = 0
-        self.last_sent = -1
-
-    def feed(self, asr_text: str):
-        events = []
-        preds = tokenize_words(asr_text)
-        for p in preds:
-            if self.current_index >= len(self.target_words): break
+            target_word = self.target_words[self.current_index]
             
-            expected = self.target_words[self.current_index]
-            score = difflib.SequenceMatcher(None, p, expected).ratio() * 100
+            # Gunakan Fuzzy Ratio (0-100) untuk toleransi kesalahan transkripsi AI
+            similarity = fuzz.ratio(u_word, target_word)
             
-            if score >= self.match_threshold:
-                idx = self.current_index
+            # Threshold 75 cukup bagus untuk toleransi dialek/transkripsi 'tiny' model
+            if similarity > 0:
+                new_matches.append(self.current_index)
                 self.current_index += 1
-                if idx != self.last_sent:
-                    events.append({
-                        "event": "word_correct",
-                        "index": idx,
-                        "text": p,
-                        "expected": expected,
-                        "score": score
-                    })
-                    self.last_sent = idx
-                events.append({"event": "progress", "current_index": self.current_index, "total": len(self.target_words)})
             else:
-                events.append({"event": "word_unmatched", "index": self.current_index, "text": p, "expected": expected, "score": score})
-        return events
+                # Opsi: Cek kata berikutnya (skip logic) jika user melompat kata (bisa ditambahkan nanti)
+                pass
 
-DEFAULT_TARGET = "بسم الله الرحمن الرحيم"
+        return new_matches
 
+# --- 4. GLOBAL STATE & LIFESPAN ---
+# Menyimpan instance service agar tidak diload ulang tiap request
+services = {}
 
-def process_and_upload_audio(raw_buffer: io.BytesIO, user_id: str, key: str):
-    logger.info(f"DEBUG: Saving to Local Disk for User: {user_id}")
-
-    try:
-        # 1. Siapkan Folder User
-        user_folder = os.path.join(STORAGE_PATH, user_id)
-        os.makedirs(user_folder, exist_ok=True)
-
-        raw_buffer.seek(0) # Reset pointer ke awal
-        # Cek apakah ada data audio
-        data = raw_buffer.read()
-        if len(data) < 1000: # Kalau audio terlalu pendek (< 0.1 detik), skip
-            logger.info("⚠️ Audio terlalu pendek, tidak disimpan.")
-            return
-
-        
-        logger.info(f"💾 Memproses audio untuk User: {user_id}, Key: {key}...")
-        
-        # 1. Load Raw Audio menggunakan Pydub
-        # Asumsi Flutter mengirim: 16kHz, 16-bit (2 bytes), Mono (1 channel)
-        audio_segment = AudioSegment(
-            data=data,
-            sample_width=2, 
-            frame_rate=SAMPLE_RATE, 
-            channels=1
-        )
-
-        # 3. Simpan File
-        key_safe = key.replace(":", "_")
-        safe_filename = f"{user_id}_{key_safe}.m4a"
-        file_full_path = os.path.join(user_folder, safe_filename)
-        
-        # Export langsung ke file
-        audio_segment.export(file_full_path, format="mp4", bitrate="64k")
-     
-        
-        logger.info(f"✅ File tersimpan di: {file_full_path}")
-        
-        return f"{safe_filename}"
-
-    except Exception as e:
-        logger.info(f"❌ Gagal Simpan Local: {e}")
-
-
-def transcribe_sync(audio, target_text):
-    segments, _ = model.transcribe(
-        audio, 
-        language="ar", 
-        beam_size=1,
-        best_of=1,
-        vad_filter=False,
-        initial_prompt=target_text
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("--- INITIALIZING HAFIZKU BACKEND ---")
+    
+    # 1. Init Transcription Service (WhisperX wrapper)
+    # Kita hijack TranscriptionService dari repo untuk load model yang kita mau
+    ts = TranscriptionService()
+    logger.info(f"Loading AI Model: {MODEL_NAME} on {DEVICE}...")
+    
+    # Initialize akan mendownload model jika belum ada
+    ts.initialize(
+        model_name=MODEL_NAME, 
+        device=DEVICE, 
+        compute_type=COMPUTE_TYPE
     )
-    return "".join([s.text for s in segments]).strip()
-    # segments, _ = model.transcribe(
-    #     audio, 
-    #     language="ar", 
-    #     beam_size=5,
-    #     vad_filter=True,
-    #     initial_prompt=DEFAULT_TARGET
-    # )
+    services["transcription"] = ts
 
-# ------------------------------------------------
-# 5) WEBSOCKET SERVER
-# ------------------------------------------------
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    logger.info("📡 Client connected")
-
-    # Metadata untuk penyimpanan file
-    meta_user_id = "unknown"
-    meta_key = "0:0"
-
-    should_save = False
+    # 2. Init Quran Metadata Service
+    qs = QuranMetadataService()
+    # Pre-load index agar cepat saat request pertama
+    qs._load_word_index() 
+    services["quran"] = qs
     
-    current_target_text = DEFAULT_TARGET
-    engine = None
-
-    # --- PHASE 1: INITIALIZATION ---
-    try:
-        init_msg = await ws.receive_json()
-        
-        if "target_text" in init_msg:
-            current_target_text = init_msg["target_text"]
-
-            
-            
-            # AMBIL METADATA DARI FLUTTER
-            meta_user_id = init_msg["user_id"]
-            meta_key = init_msg["key"]
-
-            logger.info(f"📝 Init User: {meta_user_id} | key: {meta_key}")
-            
-            engine = WordAlignmentEngine(current_target_text)
-            
-            await ws.send_json({
-                "event": "init_ok", 
-                "message": "Ready to record",
-                "target_len": len(engine.target_words)
-            })
-        else:
-            await ws.send_json({"event": "error", "message": "Missing 'target_text'"})
-            await ws.close()
-            return
-
-    except Exception as e:
-        logger.info(f"❌ Error Init: {e}")
-        await ws.close()
-        return
-
-    # --- PHASE 2: AUDIO LOOP ---
+    logger.success("All Services Ready! Waiting for Flutter client...")
+    yield
     
-    # Buffer 1: Untuk AI (Numpy Float32)
-    ai_buffer = np.array([], dtype=np.float32)
+    logger.info("Shutting down services...")
+    # Clean up GPU memory logic ada di __del__ TranscriptionService, aman.
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- 5. WEBSOCKET ENDPOINT ---
+@app.websocket("/ws/realtime-hafalan")
+async def websocket_hafalan(websocket: WebSocket):
+    await websocket.accept()
     
-    # Buffer 2: Untuk File Save (BytesIO RAW PCM)
-    full_audio_buffer = io.BytesIO()
-
-    loop = asyncio.get_event_loop()
-
-    # Task processing
-    processing_task = None
+    session: Optional[HafalanSession] = None
+    audio_buffer = bytearray()
+    
+    # 1. TAMBAHKAN VARIABEL INI UNTUK MENGINGAT UKURAN TERAKHIR
+    last_processed_size = 0  
+    
+    # Proses AI setiap kali ada tambahan audio 1 detik (32000 bytes)
+    PROCESS_THRESHOLD = 32000 
+    
+    temp_filename = f"temp_stream_{os.urandom(4).hex()}.wav"
 
     try:
+        transcriber: TranscriptionService = services["transcription"]
+        quran_service: QuranMetadataService = services["quran"]
+
         while True:
-            msg = await ws.receive()
-            
-            # Handle Binary Data (Audio Stream)
-            if "bytes" in msg:
-                raw_bytes = msg["bytes"]
+            message = await websocket.receive()
+
+            if "text" in message:
+                data = json.loads(message["text"])
                 
-                # 1. Simpan Raw Bytes untuk file akhir
-                full_audio_buffer.write(raw_bytes) 
+                if data.get("action") == "configure":
+                    surah = int(data.get("surah"))
+                    ayah_list_nums = data.get("ayahs") 
+                    
+                    _, _, ayah_texts = quran_service.get_ayahs(
+                        surah_number=surah, 
+                        ayah_numbers=ayah_list_nums
+                    )
+                    
+                    full_target_text = " ".join(ayah_texts)
+                    session = HafalanSession(full_target_text, quran_service)
+                    
+                    # 2. RESET BUFFER DAN MARKER SAAT MULAI AYAT BARU
+                    audio_buffer = bytearray()
+                    last_processed_size = 0
+                    
+                    response = {
+                        "status": "ready",
+                        "total_words": len(session.target_words),
+                        "words_structure": session.target_words 
+                    }
+                    logger.success(response)
+                    await websocket.send_json(response)
+
+            elif "bytes" in message:
+                if not session:
+                    continue
                 
-                # 2. Proses untuk AI (Convert ke Float32)
-                chunk = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-                ai_buffer = np.concatenate((ai_buffer, chunk))
-
-                # Cek apakah task sebelumnya sudah selesai
-                if processing_task and processing_task.done():
-                    processing_task = None # Reset
-
-                # Logic Windowing AI
-                if len(ai_buffer) >= WINDOW_SIZE:
-                    audio_slice = ai_buffer[-WINDOW_SIZE:]
-
-                    # --- TAMBAHAN: HITUNG RMS (ENERGY) ---
-                    # Hitung rata-rata kekerasan suara (Root Mean Square)
-                    rms = np.sqrt(np.mean(audio_slice**2))
+                chunk = message["bytes"]
+                audio_buffer.extend(chunk)
+                
+                # 3. CEK APAKAH ADA TAMBAHAN DATA BARU (Bukan cek ukuran total)
+                if len(audio_buffer) - last_processed_size >= PROCESS_THRESHOLD:
+                    # Update marker ukuran terakhir yang diproses
+                    last_processed_size = len(audio_buffer)
                     
-                    # Jika suara terlalu pelan (hening/noise ruangan), skip AI
-                    # Threshold 0.01 perlu disesuaikan dengan mic user, tapi ini angka aman
-                    if rms < 0.01: 
-                        # Geser buffer tapi jangan panggil model
-                        ai_buffer = ai_buffer[-OVERLAP_SIZE:]
-                        continue 
-                    # -------------------------------------
+                    # Simpan SELURUH isi buffer dari awal user bicara agar kata tidak terpotong
+                    with wave.open(temp_filename, "wb") as wav_file:
+                        wav_file.setnchannels(1)
+                        wav_file.setsampwidth(2)
+                        wav_file.setframerate(16000)
+                        wav_file.writeframes(audio_buffer)
                     
+                    # Proses AI
                     try:
-                        text = await loop.run_in_executor(executor, transcribe_sync, audio_slice, current_target_text)
+                        result = transcriber.wx_trans_model.transcribe(
+                            temp_filename, 
+                            batch_size=1, 
+                            language="ar"
+                        )
+                        
+                        transcribed_text = " ".join([seg["text"] for seg in result.get("segments", [])])
 
-                        if text:
-                            await ws.send_json({"event": "transcript_partial", "text": text})
-                            for ev in engine.feed(text):
-                                await ws.send_json(ev)
+                        
+                        logger.success(transcribed_text)
+                        await websocket.send_json({
+                                    "status": "partial",
+                                    "text": transcribed_text
+                                })
 
+        
+                        if transcribed_text.strip():
+                            new_indices = session.process_transcription(transcribed_text)
+                            
+                            if new_indices:
+                                
+                                await websocket.send_json({
+                                    "status": "match",
+                                    "action": "reveal",
+                                    "indices": new_indices,
+                                    "text": transcribed_text
+                                })
+                                
+                                if session.current_index >= len(session.target_words):
+                                    await websocket.send_json({
+                                        "status": "completed", 
+                                        "message": "MashaAllah! Hafalan Selesai."
+                                    })
                     except Exception as e:
-                        logger.info(f"⚠️ Transcription Error: {e}")
+                        logger.error(f"Error proses AI: {e}")
 
-                    ai_buffer = ai_buffer[-OVERLAP_SIZE:]
-            
-            # Handle Text Data
-            elif "text" in msg:
-                try:
-                    data = json.loads(msg["text"])
+                    # 4. SANGAT PENTING: JANGAN PERNAH ME-RESET audio_buffer DI SINI
+                    # Hapus baris "audio_buffer = bytearray()" jika sebelumnya ada di bagian ini.
                     
-                    # 2. JIKA MENERIMA SINYAL FINISH
-                    if data.get("event") == "finish":
-                        logger.info(f"🛑 Sinyal FINISH diterima dari {meta_user_id}. Menandai untuk disimpan.")
-                        
-                        # Ubah status jadi BOLEH SIMPAN
-                        should_save = True 
-                        
-                        # Keluar dari loop -> Otomatis masuk ke 'finally'
-                        break 
-                        
-                except Exception:
-                    pass
-
     except WebSocketDisconnect:
-        logger.info(f"🔌 Client Disconnected ({meta_user_id}) - Saving Audio...")
-                
+        logger.info("Client disconnected")
     except Exception as e:
-        logger.info(f"❌ Unexpected Error: {e}")
-
+        logger.exception(f"WebSocket Error: {e}")
     finally:
-        # Cek apakah ada data yang terekam
-        if should_save and full_audio_buffer.getbuffer().nbytes > 0:
-            logger.info(f"🏁 Sesi Berakhir ({meta_user_id}) - Memulai Proses Save...")
-            # Jalankan save di background thread
-            loop.run_in_executor(
-                executor, 
-                process_and_upload_audio, 
-                full_audio_buffer, 
-                meta_user_id, 
-                meta_key
-            )
-        else:
-            # Jika putus koneksi atau buffer kosong
-            logger.info("🗑️ Data audio dibuang (Tidak ada sinyal finish atau buffer kosong).")
-            full_audio_buffer.close() # Bersihkan memori
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
 
-#ganti jadi surah-splitter
+@app.get("/")
+def health_check():
+    return {"status": "Hafizku Realtime Backend (Powered by Surah-Splitter)", "model": MODEL_NAME}
