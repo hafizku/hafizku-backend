@@ -16,7 +16,7 @@ COPY requirements.txt .
 
 # Install Dependencies (Urutan ini penting agar Numpy 2.0 tidak menyusup)
 RUN pip install --no-cache-dir --upgrade pip && \
-  pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+  pip install --no-cache-dir torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu && \
   pip install --no-cache-dir "numpy==1.26.4" && \
   pip install --no-cache-dir -r requirements.txt
 
