@@ -10,7 +10,8 @@ pydub
 loguru
 rich
 cyclopts
-whisperx>=3.4.2
+# Gunakan WhisperX versi stabil resmi dari PIP (mendukung Numpy 1.x)
+whisperx==3.1.1
 # Dependensi AI (CPU)
 torch --index-url https://download.pytorch.org/whl/cpu
 torchaudio --index-url https://download.pytorch.org/whl/cpu
