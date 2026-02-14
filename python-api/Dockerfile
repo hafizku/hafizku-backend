@@ -21,11 +21,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir -r requirements.txt
 
 # Copy folder surah-splitter
-COPY surah-splitter /app/surah-splitter
+COPY surah_splitter /app/surah_splitter
 
 # --- PATCH OTOMATIS (MENGATASI ERROR WHISPERX.TYPES) ---
 # Docker akan otomatis mencari dan menambal kode surah-splitter yang error
-RUN find /app/surah-splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
+RUN find /app/surah_splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
 # --------------------------------------------------------
 
 # Copy source code sisanya
