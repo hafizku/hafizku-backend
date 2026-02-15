@@ -15,5 +15,6 @@ whisperx==3.1.1
 # Dependensi AI (CPU)
 torch --index-url https://download.pytorch.org/whl/cpu
 torchaudio --index-url https://download.pytorch.org/whl/cpu
-faster-whisper
+# WAJIB: Kunci faster-whisper agar cocok dengan WhisperX 3.1.1
+faster-whisper==0.9.0
 numpy==1.26.4
