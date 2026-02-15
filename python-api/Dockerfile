@@ -22,7 +22,7 @@ COPY requirements.txt .
 
 # Install PyTorch CPU TERBARU (Mendukung penuh Numpy 2.1+)
 RUN pip install --no-cache-dir --upgrade pip && \
-  pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+  pip install --no-cache-dir "torch>=2.4.0" "torchaudio>=2.4.0" --index-url https://download.pytorch.org/whl/cpu && \
   pip install --no-cache-dir -r requirements.txt
 
 # ==============================================================================
