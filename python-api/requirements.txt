@@ -2,19 +2,13 @@ fastapi
 uvicorn
 python-multipart
 websockets
-# Library Text Matching
 thefuzz
 python-Levenshtein
-# Library Surah Splitter
 pydub
 loguru
 rich
 cyclopts
-# Gunakan WhisperX versi stabil resmi dari PIP (mendukung Numpy 1.x)
-whisperx==3.1.1
-# Dependensi AI (CPU)
-torch --index-url https://download.pytorch.org/whl/cpu
-torchaudio --index-url https://download.pytorch.org/whl/cpu
-# WAJIB: Kunci faster-whisper agar cocok dengan WhisperX 3.1.1
-faster-whisper==0.10.0
-numpy==1.26.4
+# WhisperX dari GitHub (Paling up-to-date)
+git+https://github.com/m-bain/whisperx.git
+faster-whisper
+# Hapus semua batasan numpy dan torch di sini

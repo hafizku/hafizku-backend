@@ -1,4 +1,3 @@
-# Definisikan platform default
 FROM python:3.11-slim-bookworm
 
 WORKDIR /app
@@ -19,27 +18,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libavfilter-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
 COPY requirements.txt .
 
-# Install Dependencies (Urutan ini penting agar Numpy 2.0 tidak menyusup)
+# Install PyTorch CPU TERBARU (Mendukung penuh Numpy 2.1+)
 RUN pip install --no-cache-dir --upgrade pip && \
-  pip install --no-cache-dir torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu && \
-  pip install --no-cache-dir "numpy==1.26.4" && \
+  pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
   pip install --no-cache-dir -r requirements.txt
 
-# Copy folder surah-splitter
-COPY surah_splitter /app/surah_splitter
+# ==============================================================================
+# PENAMBAL AJAIB (MONKEY-PATCHING)
+# 1. Menambal pyannote.audio agar tidak memanggil fungsi torchaudio yang sudah dihapus
+RUN find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -exec sed -i 's/torchaudio\.set_audio_backend/getattr(torchaudio, "set_audio_backend", lambda x: None)/g' {} + && \
+  find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -exec sed -i 's/torchaudio\.get_audio_backend/getattr(torchaudio, "get_audio_backend", lambda: "soundfile")/g' {} +
+# ==============================================================================
 
-# --- PATCH OTOMATIS (MENGATASI ERROR WHISPERX.TYPES) ---
-# Docker akan otomatis mencari dan menambal kode surah-splitter yang error
-RUN find /app/surah_splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
-# --------------------------------------------------------
+COPY surah-splitter /app/surah-splitter
 
-# Copy source code sisanya
+# 2. Menambal surah-splitter untuk error whisperx.types
+RUN find /app/surah-splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
+
 COPY . .
 
-# Buat folder recordings
 RUN mkdir -p /app/public/recordings && \
   chmod -R 777 /app/public/recordings
 
