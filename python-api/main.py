@@ -35,7 +35,8 @@ except ImportError as e:
     sys.exit(1)
 
 # --- 2. CONFIG CPU VPS ---
-MODEL_NAME = "tiny" 
+# MODEL_NAME = "tiny" 
+MODEL_NAME = "OdyAsh/faster-whisper-base-ar-quran" 
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"
 
