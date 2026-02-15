@@ -16,6 +16,8 @@ services:
   python-api:
     build:
       context: ./python-api
+    environment:
+      - USE_NNPACK=0 # <--- Tambahkan baris ini
     container_name: hafizku-python-api
     # Agar jika crash karena RAM penuh (OOM), dia auto restart
     restart: unless-stopped
