@@ -32,10 +32,10 @@ RUN find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -
   find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -exec sed -i 's/torchaudio\.get_audio_backend/getattr(torchaudio, "get_audio_backend", lambda: "soundfile")/g' {} +
 # ==============================================================================
 
-COPY surah-splitter /app/surah-splitter
+COPY surah_splitter /app/surah_splitter
 
 # 2. Menambal surah-splitter untuk error whisperx.types
-RUN find /app/surah-splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
+RUN find /app/surah_splitter -type f -name "*.py" -exec sed -i 's/from whisperx.types import TranscriptionResult/TranscriptionResult = dict/g' {} +
 
 COPY . .
 
