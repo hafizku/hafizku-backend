@@ -76,7 +76,7 @@ OVERLAP_SECONDS = 0.6
 # OPTIMASI 1: Perbesar Window. 
 # Jangan 1.6s. Gunakan 3-4 detik agar CPU punya napas.
 # WINDOW_SECONDS = 3.0 
-# # Overlap secukupnya agar kata tidak terpotong
+# # # Overlap secukupnya agar kata tidak terpotong
 # OVERLAP_SECONDS = 1.0
 WINDOW_SIZE = int(SAMPLE_RATE * WINDOW_SECONDS)
 OVERLAP_SIZE = int(SAMPLE_RATE * OVERLAP_SECONDS)
@@ -186,23 +186,7 @@ def process_and_upload_audio(raw_buffer: io.BytesIO, user_id: str, key: str):
         logger.info(f"❌ Gagal Simpan Local: {e}")
 
 
-def transcribe_sync(audio, target_text):
-    segments, _ = model.transcribe(
-        audio, 
-        language="ar", 
-        beam_size=1,
-        best_of=1,
-        vad_filter=False,
-        initial_prompt=target_text
-    )
-    return "".join([s.text for s in segments]).strip()
-    # segments, _ = model.transcribe(
-    #     audio, 
-    #     language="ar", 
-    #     beam_size=5,
-    #     vad_filter=True,
-    #     initial_prompt=DEFAULT_TARGET
-    # )
+
 
 # ------------------------------------------------
 # 5) WEBSOCKET SERVER
@@ -289,21 +273,30 @@ async def websocket_endpoint(ws: WebSocket):
                 if len(ai_buffer) >= WINDOW_SIZE:
                     audio_slice = ai_buffer[-WINDOW_SIZE:]
 
-                    # --- TAMBAHAN: HITUNG RMS (ENERGY) ---
-                    # Hitung rata-rata kekerasan suara (Root Mean Square)
-                    rms = np.sqrt(np.mean(audio_slice**2))
                     
-                    # Jika suara terlalu pelan (hening/noise ruangan), skip AI
-                    # Threshold 0.01 perlu disesuaikan dengan mic user, tapi ini angka aman
-                    if rms < 0.01: 
-                        # Geser buffer tapi jangan panggil model
-                        ai_buffer = ai_buffer[-OVERLAP_SIZE:]
-                        continue 
-                    # -------------------------------------
                     
                     try:
+                        def transcribe_sync(audio, target_text):
+                            segments, _ = model.transcribe(
+                                audio, 
+                                language="ar", 
+                                beam_size=1,
+                                best_of=1,
+                                vad_filter=True, # Penting! Menggunakan Silero VAD bawaan faster_whisper
+                                # vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
+                                initial_prompt=target_text
+                            )
+                            return "".join([s.text for s in segments]).strip()
+                            # segments, _ = model.transcribe(
+                            #     audio, 
+                            #     language="ar", 
+                            #     beam_size=5,
+                            #     vad_filter=True,
+                            #     initial_prompt=DEFAULT_TARGET
+                            # )
+                            
                         text = await loop.run_in_executor(executor, transcribe_sync, audio_slice, current_target_text)
-
+                        logger.info(text)
                         if text:
                             await ws.send_json({"event": "transcript_partial", "text": text})
                             for ev in engine.feed(text):
