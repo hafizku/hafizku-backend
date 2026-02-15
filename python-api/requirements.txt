@@ -8,7 +8,5 @@ pydub
 loguru
 rich
 cyclopts
-# WhisperX dari GitHub (Paling up-to-date)
 git+https://github.com/m-bain/whisperx.git
 faster-whisper
-# Hapus semua batasan numpy dan torch di sini

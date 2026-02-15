@@ -20,14 +20,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
-# Install PyTorch CPU TERBARU (Mendukung penuh Numpy 2.1+)
+# 1. Install PyTorch CPU versi 2.2.2 (Versi sangat stabil sebelum era Numpy 2.0)
 RUN pip install --no-cache-dir --upgrade pip && \
-  pip install --no-cache-dir "torch>=2.4.0" "torchaudio>=2.4.0" --index-url https://download.pytorch.org/whl/cpu && \
-  pip install --no-cache-dir -r requirements.txt
+  pip install --no-cache-dir torch==2.2.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install requirements (WhisperX akan diam-diam memasukkan Numpy 2.x di sini)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 3. TRIK PAKSA: Hapus Numpy 2.x dan kembalikan ke 1.26.4 secara paksa!
+RUN pip install --no-cache-dir "numpy==1.26.4" --force-reinstall
 
 # ==============================================================================
-# PENAMBAL AJAIB (MONKEY-PATCHING)
-# 1. Menambal pyannote.audio agar tidak memanggil fungsi torchaudio yang sudah dihapus
+# PENAMBAL AJAIB (MONKEY-PATCHING) untuk Pyannote
 RUN find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -exec sed -i 's/torchaudio\.set_audio_backend/getattr(torchaudio, "set_audio_backend", lambda x: None)/g' {} + && \
   find /usr/local/lib/python3.11/site-packages/pyannote -type f -name "*.py" -exec sed -i 's/torchaudio\.get_audio_backend/getattr(torchaudio, "get_audio_backend", lambda: "soundfile")/g' {} +
 # ==============================================================================
