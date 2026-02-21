@@ -40,6 +40,14 @@ exports.up = (pgm) => {
       type: 'TEXT',
       notNull: true,
     },
+    threshold: {
+      type: 'TEXT',
+      notNull: true,
+    },
+    words: {
+      type: 'jsonb',
+      notNull: true
+    },
     created: {
       type: 'TEXT',
       notNull: true,

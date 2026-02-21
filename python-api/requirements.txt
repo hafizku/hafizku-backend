@@ -16,4 +16,5 @@ huggingface_hub
 python-dotenv
 websockets
 pydub
+python-multipart
 # torch --index-url https://download.pytorch.org/whl/cpu

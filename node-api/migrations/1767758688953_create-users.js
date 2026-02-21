@@ -24,6 +24,7 @@ exports.up = (pgm) => {
     phone: {
       type: 'TEXT',
       notNull: true,
+      unique: true,
     },
     avatar: {
       type: 'TEXT',

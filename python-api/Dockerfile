@@ -14,10 +14,10 @@
 
 
 # Definisikan platform default jika tidak diisi
-ARG PLATFORM=linux/amd64
-FROM --platform=${PLATFORM} python:3.11-slim
+# ARG PLATFORM=linux/amd64
+# FROM --platform=${PLATFORM} python:3.11-slim
 
-# FROM python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 

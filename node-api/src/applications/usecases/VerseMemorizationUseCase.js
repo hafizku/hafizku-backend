@@ -9,7 +9,9 @@ class VerseMemorizationUseCase {
   }
 
   async addVerseMemorization(userId, verseId, useCasePayload) {
+
     const addVerseMemorization = new AddVerseMemorization(useCasePayload);
+
     const data = await this._verseMemorizationRepository.addVerseMemorization(userId, verseId, addVerseMemorization);
 
     return {
@@ -21,7 +23,9 @@ class VerseMemorizationUseCase {
   }
 
   async editVerseMemorization(userId, verseId, useCasePayload) {
+
     const editVerseMemorization = new EditVerseMemorization(useCasePayload);
+
     await this._verseMemorizationRepository.editVerseMemorization(verseId, userId, editVerseMemorization);
     return {
       id: verseId,
@@ -41,8 +45,16 @@ class VerseMemorizationUseCase {
         id: null,
         score: null,
         audio: null,
+        threshold: null,
+        words: null,
         status: 'new'
       }
+    }
+
+    let wordsData = verseDetailHistory.words;
+
+    if (!Array.isArray(wordsData)) {
+      wordsData = [];
     }
 
     return {
@@ -53,6 +65,8 @@ class VerseMemorizationUseCase {
         score: parseInt(verseDetailHistory.score),
         status: verseDetailHistory.status,
         audio: verseDetailHistory.audio,
+        threshold: verseDetailHistory.threshold,
+        words: wordsData,
       }
     };
   }
@@ -66,6 +80,7 @@ class VerseMemorizationUseCase {
     const idMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.id]));
     const statusMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.status]));
     const audioMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.audio]));
+    const thresholdMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.threshold]));
 
     let totalMemorizedVerse = 0;
 
@@ -73,6 +88,7 @@ class VerseMemorizationUseCase {
       const score = progressMap.get(verse.key) || 0;
       const verseId = idMap.get(verse.key) || null;
       const audio = audioMap.get(verse.key) || '-';
+      const threshold = thresholdMap.get(verse.key) || null;
       const statusVerse = statusMap.get(verse.key) || 'new';
 
       if (statusVerse == 'memorized') {
@@ -86,7 +102,9 @@ class VerseMemorizationUseCase {
           id: verseId,
           status: statusVerse,
           audio: audio,
+          threshold: threshold,
           score: parseInt(score),
+          words: []
         }
       };
     });

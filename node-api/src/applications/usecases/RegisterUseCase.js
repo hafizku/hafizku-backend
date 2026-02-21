@@ -9,6 +9,7 @@ class RegisterUseCase {
   async execute(useCasePayload) {
     const registerUser = new RegisterUser(useCasePayload);
     await this._userRepository.verifyAvailableEmail(registerUser.email);
+    await this._userRepository.verifyAvailablePhone(registerUser.phone);
     registerUser.password = await this._passwordHash.hash(registerUser.password);
     return this._userRepository.addUser(registerUser);
   }

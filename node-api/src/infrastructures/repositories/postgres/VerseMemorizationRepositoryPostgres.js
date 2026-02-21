@@ -3,22 +3,22 @@ const VerseMemorization = require("../../../domains/verse_memorizations/entities
 const NotFoundError = require("../../../commons/exceptions/NotFoundError");
 
 class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
-  constructor(pool, idGenerator, moment) {
+  constructor(pool, idGenerator, dayjs) {
     super();
     this._pool = pool;
     this._idGenerator = idGenerator;
-    this._moment = moment;
+    this._dayjs = dayjs;
   }
 
 
   async addVerseMemorization(userId, verseId, addVerseMemorization) {
-    const { juz, page, surah, verse, audio, status, score } = addVerseMemorization;
+    const { juz, page, surah, verse, audio, status, score, threshold, wordstranscript } = addVerseMemorization;
     const id = `versememorization-${this._idGenerator()}`;
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, score, page, verse_id',
-      values: [id, userId, juz, page, surah, verse, audio, status, score, date, date, verseId]
+      text: 'INSERT INTO versememorizations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, score, page, verse_id',
+      values: [id, userId, juz, page, surah, verse, audio, status, score, threshold, wordstranscript, date, date, verseId]
     };
 
     const result = await this._pool.query(query);
@@ -26,21 +26,24 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
     return result.rows[0];
   }
 
+
   async editVerseMemorization(verseId, userId, editVerseMemorization) {
-    const { audio, status, score } = editVerseMemorization;
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const { audio, status, score, threshold, wordstranscript } = editVerseMemorization;
+
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'UPDATE versememorizations SET audio = $1, status = $2, score = $3, updated = $4 WHERE id = $5 AND user_id = $6',
-      values: [audio, status, score, date, verseId, userId]
+      text: 'UPDATE versememorizations SET audio = $1, status = $2, score = $3, threshold = $4, words = $5, updated = $6 WHERE id = $7 AND user_id = $8',
+      values: [audio, status, score, threshold, JSON.stringify(wordstranscript), date, verseId, userId]
     };
 
     await this._pool.query(query);
   }
 
+
   async getVerseDetailMemorization(userId, verseMemoId) {
     const query = {
-      text: "SELECT id, score, status, audio FROM versememorizations WHERE id = $1 AND user_id = $2",
+      text: "SELECT id, score, status, threshold, words, audio FROM versememorizations WHERE id = $1 AND user_id = $2",
       values: [verseMemoId, userId]
     };
 
@@ -54,7 +57,7 @@ class VerseMemorizationRepositoryPostgres extends VerseMemorizationRepository {
 
   async getVerseMemorization(userId, page) {
     const query = {
-      text: "SELECT id, verse, surah, juz, score, status, audio, updated FROM versememorizations WHERE page = $1 AND user_id = $2",
+      text: "SELECT id, verse, surah, juz, score, threshold, status, audio, updated FROM versememorizations WHERE page = $1 AND user_id = $2",
       values: [page, userId]
     };
 

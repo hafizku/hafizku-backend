@@ -17,6 +17,7 @@ class VerseMemorizationsHandler {
   }
 
   async postVerseMemorizationHandler(request, h) {
+
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const { verseId } = request.params;
@@ -33,6 +34,7 @@ class VerseMemorizationsHandler {
   }
 
   async putVerseMemorizationHandler(request, h) {
+
     const verseMemorizationUseCase = this._container.getInstance(VerseMemorizationUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const { verseId } = request.params;

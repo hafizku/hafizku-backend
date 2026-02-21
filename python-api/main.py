@@ -17,9 +17,33 @@ from huggingface_hub import login
 from pydub import AudioSegment
 import logging
 
-app = FastAPI()
+# new
+import glob
+import shutil
+from fastapi import File, UploadFile, Form
+from fastapi.responses import JSONResponse
+import time
+from fastapi import Request
 
+
+app = FastAPI()
 load_dotenv()
+
+# --- MIDDLEWARE  ---
+@app.middleware("http")
+async def log_response_time(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    
+    # Cetak ke terminal / docker logs
+    logger.info(f"⏱️ [PERFORMANCE] {request.method} {request.url.path} selesai dalam {process_time:.3f} detik")
+    
+    # Tambahkan ke header response (opsional)
+    response.headers["X-Process-Time"] = str(process_time)
+    
+    return response
+# --------------------------------
 
 # Konfigurasi logging agar muncul di terminal Docker
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -37,12 +61,17 @@ token = os.getenv("HF_TOKEN")
 if token:
     login(token=token)
 
-MODEL_ID = "OdyAsh/faster-whisper-base-ar-quran" 
+# MODEL_ID = "OdyAsh/faster-whisper-base-ar-quran" 
+MODEL_ID = "tiny" 
+
+logger.info(f"user model: {MODEL_ID}.")
 
 # Deteksi Core: Di VPS kecil, jangan gunakan semua core untuk AI
 # Sisakan resource untuk menghandle WebSocket
 total_cores = multiprocessing.cpu_count()
-ai_threads = max(1, total_cores - 1) if total_cores > 2 else total_cores
+
+# ai_threads = max(1, total_cores - 1) if total_cores > 2 else total_cores
+ai_threads = 4
 # Intra-op threads untuk komputasi matriks
 os.environ["OMP_NUM_THREADS"] = str(ai_threads) 
 
@@ -101,26 +130,37 @@ def normalize_arabic(text: str) -> str:
     text = re.sub("[^\u0600-\u06FF\s]", " ", text)
     return re.sub("\s+", " ", text).strip()
 
+# def normalize_arabic(text: str) -> str:
+#     if not text:
+#         return ""
+#     # Filter ketat hanya menyisakan huruf Arab dan spasi
+#     text = re.sub(r"[^\u060f\u0620-\u064a\u066e\u066f\u0671-\u06d3\u06d5\s]", "", text)
+#     return re.sub(r"\s+", " ", text).strip()
+
 def tokenize_words(text: str) -> List[str]:
     t = normalize_arabic(text)
     return t.split() if t else []
 
+
 class WordAlignmentEngine:
-    def __init__(self, target_text: str, match_threshold=65.0):
+    def __init__(self, target_text: str, match_threshold: float, current_index: int):
         self.target_text = target_text
         self.target_words = tokenize_words(target_text)
         self.match_threshold = match_threshold
-        self.current_index = 0
+        self.current_index = current_index
         self.last_sent = -1
 
     def feed(self, asr_text: str):
         events = []
+        original_words = asr_text.split()
         preds = tokenize_words(asr_text)
-        for p in preds:
+        for i, p in enumerate(preds):
             if self.current_index >= len(self.target_words): break
             
             expected = self.target_words[self.current_index]
             score = difflib.SequenceMatcher(None, p, expected).ratio() * 100
+
+            actual_text = original_words[i] if i < len(original_words) else p
             
             if score >= self.match_threshold:
                 idx = self.current_index
@@ -129,14 +169,47 @@ class WordAlignmentEngine:
                     events.append({
                         "event": "word_correct",
                         "index": idx,
-                        "text": p,
+                        "text": actual_text,
                         "expected": expected,
                         "score": score
                     })
                     self.last_sent = idx
-                events.append({"event": "progress", "current_index": self.current_index, "total": len(self.target_words)})
+                # events.append({"event": "progress", "current_index": self.current_index, "total": len(self.target_words)})
             else:
-                events.append({"event": "word_unmatched", "index": self.current_index, "text": p, "expected": expected, "score": score})
+                # ❌ KATA TIDAK COCOK DENGAN TARGET
+                is_ancang_ancang = False
+                
+                # Kita cek mundur, misalnya maksimal 5 kata ke belakang
+                start_check = max(0, self.current_index - 5)
+                previous_words = self.target_words[start_check : self.current_index]
+                
+                for prev_word in previous_words:
+                    prev_score = difflib.SequenceMatcher(None, p, prev_word).ratio() * 100
+                    if prev_score >= self.match_threshold:
+                        is_ancang_ancang = True
+                        break # Berhenti mencari, sudah dipastikan ini kata masa lalu
+                
+                # 3. Klasifikasi hasil ketidakcocokan
+                if is_ancang_ancang:
+                    # Ini adalah kata ancang-ancang.
+                    # Kita lempar event berbeda agar UI Flutter TIDAK menampilkan warna merah/error
+                    # events.append({
+                    #     "event": "word_repeated", 
+                    #     "text": actual_text,
+                    #     "info": "User mengambil ancang-ancang"
+                    # })
+                    continue
+                else:
+                    # Ini benar-benar kata yang salah / noise murni
+                    events.append({
+                        "event": "word_unmatched", 
+                        "index": self.current_index, 
+                        "text": actual_text, 
+                        "expected": expected, 
+                        "score": score
+                    })
+            # else:
+            #     events.append({"event": "word_unmatched", "index": self.current_index, "text": actual_text, "expected": expected, "score": score})
         return events
 
 DEFAULT_TARGET = "بسم الله الرحمن الرحيم"
@@ -186,6 +259,179 @@ def process_and_upload_audio(raw_buffer: io.BytesIO, user_id: str, key: str):
         logger.info(f"❌ Gagal Simpan Local: {e}")
 
 
+def transcribe_sync(audio, target_text):
+    segments, _ = model.transcribe(
+        audio, 
+        language="ar", 
+        beam_size=1,
+        best_of=1,
+        vad_filter=True, # Penting! Menggunakan Silero VAD bawaan faster_whisper
+        # vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
+        initial_prompt=target_text
+    )
+    return "".join([s.text for s in segments]).strip()
+    # segments, _ = model.transcribe(
+    #     audio, 
+    #     language="ar", 
+    #     beam_size=5,
+    #     vad_filter=True,
+    #     initial_prompt=DEFAULT_TARGET
+    # )
+
+def transcribe_file_sync(file_path: str, target_text: str):
+    """Digunakan oleh REST API (Menerima path file utuh)"""
+    segments, _ = model.transcribe(
+        file_path, 
+        language="ar", 
+        beam_size=3,        # <--- Ubah ke 3 atau 5 agar tidak gampang "blank"
+        best_of=1,
+        vad_filter=False, 
+        condition_on_previous_text=False,
+        initial_prompt=target_text,
+        
+    )
+    return "".join([s.text for s in segments]).strip()
+
+
+@app.post("/evaluate")
+async def evaluate_chunk(
+    audio: UploadFile = File(...),
+    target_text: str = Form(...),
+    user_id: str = Form(...),
+    key: str = Form(...),
+    threshold: float = Form(65.0),
+    chunk_index: int = Form(...),
+    current_index: int = Form(...)
+):
+    """Mengevaluasi satu potongan rekaman saat user melepas tombol mic."""
+    session_dir = os.path.join(STORAGE_PATH, user_id, key.replace(":", "_"))
+    os.makedirs(session_dir, exist_ok=True)
+    
+    chunk_path = os.path.join(session_dir, f"chunk_{chunk_index:03d}.m4a")
+    with open(chunk_path, "wb") as buffer:
+        shutil.copyfileobj(audio.file, buffer)
+        
+    logger.info(f"📥 Menerima chunk ke-{chunk_index} dari {user_id} (Target: {target_text})")
+
+    # --- HITUNG WAKTU AI ---
+    ai_start_time = time.time() # Mulai Stopwatch
+
+    loop = asyncio.get_event_loop()
+    transcribed_text = await loop.run_in_executor(
+        executor, 
+        transcribe_file_sync, 
+        chunk_path, 
+        target_text
+    )
+
+    ai_process_time = time.time() - ai_start_time # Stop Stopwatch
+    logger.info(f"🧠 AI Inference memakan waktu: {ai_process_time:.3f} detik")
+
+    
+    engine = WordAlignmentEngine(target_text,threshold, current_index)
+    events = engine.feed(transcribed_text)
+
+    logger.info(f"transcribed_text: {transcribed_text}")
+    logger.info(f"detail: {events}")
+    
+    return JSONResponse(content={
+        "status": "success",
+        "target_text": target_text,
+        "transcribed_text": transcribed_text,
+        "details": events
+    })
+
+
+@app.post("/finish")
+async def finish_ayah(
+    user_id: str = Form(...),
+    key: str = Form(...)
+):
+    """Menggabungkan semua potongan rekaman dan menyimpannya secara lokal saat ayat selesai."""
+    session_dir = os.path.join(STORAGE_PATH, user_id, key.replace(":", "_"))
+    
+    if not os.path.exists(session_dir):
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Sesi chunking tidak ditemukan"})
+
+    try:
+        # Ambil semua file chunk dan urutkan
+        chunk_files = sorted(glob.glob(os.path.join(session_dir, "chunk_*.m4a")))
+        
+        if not chunk_files:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Tidak ada audio untuk digabungkan"})
+
+        logger.info(f"🔗 Menggabungkan {len(chunk_files)} potongan audio untuk {user_id}...")
+        
+        merged_audio = AudioSegment.empty()
+        for file in chunk_files:
+            merged_audio += AudioSegment.from_file(file)
+            
+        # Simpan file gabungan ke folder utama user (seperti fungsi WebSocket existing)
+        user_folder = os.path.join(STORAGE_PATH, user_id)
+        os.makedirs(user_folder, exist_ok=True)
+        
+        key_safe = key.replace(":", "_")
+        safe_filename = f"{user_id}_{key_safe}.m4a"
+        final_file_path = os.path.join(user_folder, safe_filename)
+        
+        # Export file gabungan
+        merged_audio.export(final_file_path, format="mp4", bitrate="64k")
+        logger.info(f"✅ File gabungan berhasil disimpan secara lokal di: {final_file_path}")
+        
+        # Bersihkan file potongan (chunk) dan folder temporary agar tidak memenuhi disk
+        for file in chunk_files:
+            os.remove(file)
+        try:
+            os.rmdir(session_dir)
+        except OSError:
+            pass # Folder mungkin tidak kosong jika ada file lain
+
+        return JSONResponse(content={
+            "status": "success",
+            "message": "Audio berhasil digabungkan dan disimpan",
+            "file_saved": safe_filename # Flutter dapat menggunakan nama file ini untuk memutar audionya
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error saat finish ayat: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.post("/reset")
+async def finish_ayah(
+    user_id: str = Form(...),
+    key: str = Form(...)
+):
+    session_dir = os.path.join(STORAGE_PATH, user_id, key.replace(":", "_"))
+    
+    if not os.path.exists(session_dir):
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Sesi chunking tidak ditemukan"})
+
+    try:
+        # Ambil semua file chunk dan urutkan
+        chunk_files = sorted(glob.glob(os.path.join(session_dir, "chunk_*.m4a")))
+        
+        if not chunk_files:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Tidak ada audio"})
+
+        logger.info(f"🔗 Menghapus {len(chunk_files)} potongan audio untuk {user_id}...")
+        
+        # Bersihkan file potongan (chunk) dan folder temporary agar tidak memenuhi disk
+        for file in chunk_files:
+            os.remove(file)
+        try:
+            os.rmdir(session_dir)
+        except OSError:
+            pass # Folder mungkin tidak kosong jika ada file lain
+
+        return JSONResponse(content={
+            "status": "success",
+            "message": "Audio chunk berhasil direset"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error saat reset audio chunk: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 # ------------------------------------------------
@@ -272,29 +518,8 @@ async def websocket_endpoint(ws: WebSocket):
                 # Logic Windowing AI
                 if len(ai_buffer) >= WINDOW_SIZE:
                     audio_slice = ai_buffer[-WINDOW_SIZE:]
-
                     
-                    
-                    try:
-                        def transcribe_sync(audio, target_text):
-                            segments, _ = model.transcribe(
-                                audio, 
-                                language="ar", 
-                                beam_size=1,
-                                best_of=1,
-                                vad_filter=True, # Penting! Menggunakan Silero VAD bawaan faster_whisper
-                                # vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
-                                initial_prompt=target_text
-                            )
-                            return "".join([s.text for s in segments]).strip()
-                            # segments, _ = model.transcribe(
-                            #     audio, 
-                            #     language="ar", 
-                            #     beam_size=5,
-                            #     vad_filter=True,
-                            #     initial_prompt=DEFAULT_TARGET
-                            # )
-                            
+                    try:    
                         text = await loop.run_in_executor(executor, transcribe_sync, audio_slice, current_target_text)
                         logger.info(text)
                         if text:

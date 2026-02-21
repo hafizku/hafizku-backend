@@ -31,6 +31,10 @@ class UserRepository {
     throw new Error('USER_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 
+  async verifyAvailablePhone(phone) {
+    throw new Error('USER_REPOSITORY.METHOD_NOT_IMPLEMENTED');
+  }
+
   async verifyAdmin(credentialId) {
     throw new Error('USER_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }

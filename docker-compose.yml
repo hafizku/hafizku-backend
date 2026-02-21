@@ -16,9 +16,6 @@ services:
   python-api:
     build:
       context: ./python-api
-      args:
-        # - PLATFORM=linux/arm64
-        - PLATFORM=linux/amd64
     container_name: hafizku-python-api
     env_file:
       - .env

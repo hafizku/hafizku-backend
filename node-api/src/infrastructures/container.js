@@ -5,10 +5,17 @@ const { createContainer } = require('instances-container');
 //external agency
 const { nanoid } = require('nanoid');
 const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
 const Jwt = require('@hapi/jwt');
 const pool = require('./database/postgres/pool');
-const moment = require('moment');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 const quran = require('hafizku-quran');
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault("Asia/Jakarta");
 
 //services
 const UserRepositoryPostgres = require('./repositories/postgres/UserRepositoryPostgres');
@@ -17,6 +24,7 @@ const VerseMemorizationRepositoryPostgres = require('./repositories/postgres/Ver
 const BcryptPasswordHash = require('./security/BcryptPasswordHash');
 const JwtTokenManager = require('./security/JwtTokenManager');
 const QcQuranService = require('./services/QcQuranService');
+const HafizkuEmailService = require('./services/HafizkuEmailService');
 
 //use cases
 const RegisterUseCase = require('../applications/usecases/RegisterUseCase');
@@ -31,6 +39,7 @@ const VerseMemorizationRepository = require('../domains/verse_memorizations/Vers
 const PasswordHash = require('../applications/security/PasswordHash');
 const TokenManager = require('../applications/security/TokenManager');
 const QuranService = require('../applications/services/QuranService');
+const EmailService = require('../applications/services/EmailService');
 
 //creating container
 const container = createContainer();
@@ -49,7 +58,7 @@ container.register([
           concrete: nanoid
         },
         {
-          concrete: moment
+          concrete: dayjs
         }
       ]
     }
@@ -88,6 +97,17 @@ container.register([
     }
   },
   {
+    key: EmailService.name,
+    Class: HafizkuEmailService,
+    parameter: {
+      dependencies: [
+        {
+          concrete: nodemailer
+        }
+      ]
+    }
+  },
+  {
     key: VerseMemorizationRepository.name,
     Class: VerseMemorizationRepositoryPostgres,
     parameter: {
@@ -99,7 +119,7 @@ container.register([
           concrete: nanoid
         },
         {
-          concrete: moment
+          concrete: dayjs
         }
       ]
     }

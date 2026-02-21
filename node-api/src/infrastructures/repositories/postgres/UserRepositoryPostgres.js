@@ -6,11 +6,11 @@ const NotFoundError = require("../../../commons/exceptions/NotFoundError");
 require('dotenv').config();
 
 class UserRepositoryPostgres extends UserRepository {
-  constructor(pool, idGenerator, moment) {
+  constructor(pool, idGenerator, dayjs) {
     super();
     this._pool = pool;
     this._idGenerator = idGenerator;
-    this._moment = moment;
+    this._dayjs = dayjs;
   }
 
   async verifyAvailableEmail(email) {
@@ -23,6 +23,19 @@ class UserRepositoryPostgres extends UserRepository {
 
     if (result.rowCount) {
       throw new InvariantError('Email sudah digunakan');
+    }
+  }
+
+  async verifyAvailablePhone(phone) {
+    const query = {
+      text: 'SELECT phone FROM users WHERE phone = $1',
+      values: [phone]
+    };
+
+    const result = await this._pool.query(query);
+
+    if (result.rowCount) {
+      throw new InvariantError('Nomor HP sudah digunakan');
     }
   }
 
@@ -55,7 +68,7 @@ class UserRepositoryPostgres extends UserRepository {
     if (role == 'parent') {
       tokenParent = `${name}-${this._idGenerator()}`;
     }
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
       text: 'INSERT INTO users VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
@@ -67,7 +80,7 @@ class UserRepositoryPostgres extends UserRepository {
 
   async editUser(userId, editUser) {
     const { name, phone, birthdate, gender, avatar } = editUser;
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
       text: 'UPDATE users SET name = $1, phone = $2, birth_date = $3, updated = $4, gender = $5, avatar = $6 WHERE id = $7',
@@ -79,7 +92,7 @@ class UserRepositoryPostgres extends UserRepository {
 
   async changePassword(userId, changePassword) {
     const { newPassword } = changePassword;
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
       text: 'UPDATE users SET password = $1, updated = $2 WHERE id = $3',
@@ -174,7 +187,7 @@ class UserRepositoryPostgres extends UserRepository {
 
   async parentLink(userId, parentId) {
     const id = `parentchild-${this._idGenerator()}`;
-    const date = this._moment().format('DD/MM/YYYY HH:mm:ss');
+    const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
       text: 'INSERT INTO parentchilds VALUES($1,$2,$3,$4,$5)',
