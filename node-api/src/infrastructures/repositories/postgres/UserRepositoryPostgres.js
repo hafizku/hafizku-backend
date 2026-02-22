@@ -39,6 +39,19 @@ class UserRepositoryPostgres extends UserRepository {
     }
   }
 
+  async verifyAvailableUsername(username) {
+    const query = {
+      text: 'SELECT username FROM users WHERE username = $1',
+      values: [username]
+    };
+
+    const result = await this._pool.query(query);
+
+    if (result.rowCount) {
+      throw new InvariantError('Username sudah digunakan');
+    }
+  }
+
   async verifyAdmin(credentialId) {
     const query = {
       text: 'SELECT role FROM users WHERE id = $1',
@@ -56,7 +69,7 @@ class UserRepositoryPostgres extends UserRepository {
   }
 
   async addUser(registerUser) {
-    const { email, password, name, role, phone, token } = registerUser;
+    const { username, email, password, name, role, phone, token } = registerUser;
     const id = `user-${this._idGenerator()}`;
     let roleData = role;
     if (token != null && token != '-' && token == process.env.ADMIN_TOKEN) {
@@ -71,8 +84,8 @@ class UserRepositoryPostgres extends UserRepository {
     const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'INSERT INTO users VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      values: [id, email, password, name, phone, '-', 'free', roleData, tokenParent, date, date]
+      text: 'INSERT INTO users VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      values: [id, username, email, password, name, phone, '-', 'free', roleData, tokenParent, date, date]
     };
 
     return this._pool.query(query);
@@ -105,7 +118,7 @@ class UserRepositoryPostgres extends UserRepository {
   async getUserByEmailOrPhone(email) {
     let queryText;
     if (email.includes('@')) {
-      queryText = 'SELECT id, email, password, name, role, status, avatar FROM users WHERE email = $1';
+      queryText = 'SELECT id, username, email, password, name, role, status, avatar FROM users WHERE email = $1';
     } else {
       queryText = 'SELECT id, email, password, name, role, status, avatar FROM users WHERE phone = $1';
     }
@@ -118,7 +131,22 @@ class UserRepositoryPostgres extends UserRepository {
     if (result.rowCount) {
       return { ...result.rows[0] };
     } else {
-      throw new AuthenticationError('email atau nomor hp belum terdaftar');
+      throw new AuthenticationError('akun belum terdaftar');
+    }
+
+  }
+
+  async getUserByUsername(username) {
+    const query = {
+      text: "SELECT id, username, email, password, name, role, status, avatar FROM users WHERE username = $1",
+      values: [username]
+    };
+
+    const result = await this._pool.query(query);
+    if (result.rowCount) {
+      return { ...result.rows[0] };
+    } else {
+      throw new AuthenticationError('akun belum terdaftar');
     }
 
   }

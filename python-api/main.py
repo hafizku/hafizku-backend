@@ -145,72 +145,120 @@ def tokenize_words(text: str) -> List[str]:
 class WordAlignmentEngine:
     def __init__(self, target_text: str, match_threshold: float, current_index: int):
         self.target_text = target_text
-        self.target_words = tokenize_words(target_text)
+        self.target_words = tokenize_words(target_text) # Asumsi fungsi ini sudah ada
         self.match_threshold = match_threshold
         self.current_index = current_index
         self.last_sent = -1
+        
+        # 📊 FITUR BARU: Kamus untuk melacak jumlah salah per index kata
+        # Contoh bentuknya: {0: 0, 1: 2, 2: 0, 3: 1 ...}
+        self.word_errors = {i: 0 for i in range(len(self.target_words))}
 
     def feed(self, asr_text: str):
         events = []
         original_words = asr_text.split()
         preds = tokenize_words(asr_text)
+        
+        # Flag penanda: Apakah di dalam rekaman kali ini target utamanya sudah ketemu?
+        found_anchor = False 
+        
         for i, p in enumerate(preds):
-            if self.current_index >= len(self.target_words): break
+            if self.current_index >= len(self.target_words): 
+                break
             
             expected = self.target_words[self.current_index]
-            score = difflib.SequenceMatcher(None, p, expected).ratio() * 100
-
             actual_text = original_words[i] if i < len(original_words) else p
             
-            if score >= self.match_threshold:
-                idx = self.current_index
-                self.current_index += 1
-                if idx != self.last_sent:
-                    events.append({
-                        "event": "word_correct",
-                        "index": idx,
-                        "text": actual_text,
-                        "expected": expected,
-                        "score": score
-                    })
-                    self.last_sent = idx
-                # events.append({"event": "progress", "current_index": self.current_index, "total": len(self.target_words)})
-            else:
-                # ❌ KATA TIDAK COCOK DENGAN TARGET
-                is_ancang_ancang = False
-                
-                # Kita cek mundur, misalnya maksimal 5 kata ke belakang
-                start_check = max(0, self.current_index - 5)
-                previous_words = self.target_words[start_check : self.current_index]
-                
-                for prev_word in previous_words:
-                    prev_score = difflib.SequenceMatcher(None, p, prev_word).ratio() * 100
-                    if prev_score >= self.match_threshold:
-                        is_ancang_ancang = True
-                        break # Berhenti mencari, sudah dipastikan ini kata masa lalu
-                
-                # 3. Klasifikasi hasil ketidakcocokan
-                if is_ancang_ancang:
-                    # Ini adalah kata ancang-ancang.
-                    # Kita lempar event berbeda agar UI Flutter TIDAK menampilkan warna merah/error
-                    # events.append({
-                    #     "event": "word_repeated", 
-                    #     "text": actual_text,
-                    #     "info": "User mengambil ancang-ancang"
-                    # })
-                    continue
+            # Hitung skor kecocokan
+            score = difflib.SequenceMatcher(None, p, expected).ratio() * 100
+            is_match = score >= self.match_threshold
+            
+            # ========================================================
+            # SKENARIO 1: Baru Memulai Ayat (current_index == 0)
+            # ========================================================
+            if self.current_index == 0:
+                if is_match:
+                    self._emit_correct(events, expected, actual_text, score)
+                    found_anchor = True
                 else:
-                    # Ini benar-benar kata yang salah / noise murni
-                    events.append({
-                        "event": "word_unmatched", 
-                        "index": self.current_index, 
-                        "text": actual_text, 
-                        "expected": expected, 
-                        "score": score
-                    })
-            # else:
-            #     events.append({"event": "word_unmatched", "index": self.current_index, "text": actual_text, "expected": expected, "score": score})
+                    # Langsung hitung salah, kirim feedback unmatch, dan HENTIKAN proses kata selanjutnya
+                    self.word_errors[self.current_index] += 1
+                    self._emit_unmatched(events, expected, actual_text, score)
+                    break 
+
+            # ========================================================
+            # SKENARIO 2: Sedang di Tengah Hafalan (current_index > 0)
+            # ========================================================
+            else:
+                # 2A. Jika KATA TARGET BELUM KETEMU dalam rentetan ucapan ini
+                if not found_anchor:
+                    if is_match:
+                        # Alhamdulillah ketemu!
+                        found_anchor = True
+                        self._emit_correct(events, expected, actual_text, score)
+                    else:
+                        # Kata belum cocok. Kita cek apakah ini ancang-ancang?
+                        if i < (len(preds)-1):
+                            continue
+                            
+                        else:
+                            # Jika ini kata yang murni salah/ngawur, kita hitung diam-diam
+                            self.word_errors[self.current_index] += 1
+                            self._emit_unmatched(events, expected, actual_text, score)
+                            # LANJUTKAN LOOP (Continue) tanpa mengirim feedback unmatch ke Flutter
+                            break
+                
+                # 2B. Jika KATA TARGET SUDAH KETEMU (Mengecek kata ekornya)
+                else:
+                    if is_match:
+                        # Ternyata kata selanjutnya juga benar
+                        self._emit_correct(events, expected, actual_text, score)
+                    else:
+                        # Kata sambungannya salah! Hitung error, kirim unmatch, dan putus loop
+                        self.word_errors[self.current_index] += 1
+                        self._emit_unmatched(events, expected, actual_text, score)
+                        break
+
         return events
+
+    # -----------------------------------------------------------------
+    # FUNGSI HELPER (Agar loop utama di atas lebih mudah dibaca)
+    # -----------------------------------------------------------------
+    
+    def _emit_correct(self, events, expected, actual_text, score):
+        idx = self.current_index
+        self.current_index += 1
+        if idx != self.last_sent:
+            events.append({
+                "event": "word_correct",
+                "index": idx,
+                "text": actual_text,
+                "expected": expected,
+                "score": score,
+                "error_count": self.word_errors[idx]
+            })
+            self.last_sent = idx
+
+    def _emit_unmatched(self, events, expected, actual_text, score):
+        events.append({
+            "event": "word_unmatched",
+            "index": self.current_index,
+            "text": actual_text,
+            "expected": expected,
+            "score": score,
+            "error_count": self.word_errors[self.current_index]
+        })
+
+    # def _is_ancang_ancang(self, word: str) -> bool:
+    #     # Mengecek apakah kata ini ada di 5 kata sebelumnya
+    #     start_check = max(0, self.current_index - 5)
+    #     previous_words = self.target_words[start_check : self.current_index]
+        
+    #     for prev_word in previous_words:
+    #         prev_score = difflib.SequenceMatcher(None, word, prev_word).ratio() * 100
+    #         if prev_score >= self.match_threshold:
+    #             return True
+    #     return False
 
 DEFAULT_TARGET = "بسم الله الرحمن الرحيم"
 

@@ -3,8 +3,9 @@ class RegisterUser {
     this._verifyPayload(payload);
 
 
-    const { email, password, name, role, phone, token } = payload;
+    const { username, email, password, name, role, phone, token } = payload;
 
+    this.username = username;
     this.email = email;
     this.password = password;
     this.name = name;
@@ -13,12 +14,12 @@ class RegisterUser {
     this.token = token;
   }
 
-  _verifyPayload({ email, password, name, role, phone }) {
-    if (!email, !password, !name, !role, !phone) {
+  _verifyPayload({ username, email, password, name, role, phone }) {
+    if (!username, !email, !password, !name, !role, !phone) {
       throw new Error('NOT_CONTAIN_NEEDED_PROPERTY');
     }
 
-    if (typeof email !== 'string' || typeof password !== 'string' || typeof name !== 'string' || typeof role !== 'string' || typeof phone !== 'string') {
+    if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof name !== 'string' || typeof role !== 'string' || typeof phone !== 'string') {
       throw new Error('NOT_MEET_DATA_TYPE_SPECIFICATION');
     }
   }

@@ -20,6 +20,7 @@ dayjs.tz.setDefault("Asia/Jakarta");
 //services
 const UserRepositoryPostgres = require('./repositories/postgres/UserRepositoryPostgres');
 const VerseMemorizationRepositoryPostgres = require('./repositories/postgres/VerseMemorizationRepositoryPostgres');
+const ParentalPraiseRepositoryPostgres = require('./repositories/postgres/ParentalPraiseRepositoryPostgres');
 
 const BcryptPasswordHash = require('./security/BcryptPasswordHash');
 const JwtTokenManager = require('./security/JwtTokenManager');
@@ -32,9 +33,11 @@ const LoginUseCase = require('../applications/usecases/LoginUseCase');
 const ChangePasswordUseCase = require('../applications/usecases/ChangePasswordUseCase');
 const UserUseCase = require('../applications/usecases/UserUseCase');
 const VerseMemorizationUseCase = require('../applications/usecases/VerseMemorizationUseCase');
+const ParentalPraiseUseCase = require('../applications/usecases/ParentalPraiseUseCase');
 
 const UserRepository = require('../domains/users/UserRepository');
 const VerseMemorizationRepository = require('../domains/verse_memorizations/VerseMemorizationRepository');
+const ParentalPraiseRepository = require('../domains/parental_praise/ParentalPraiseRepository');
 
 const PasswordHash = require('../applications/security/PasswordHash');
 const TokenManager = require('../applications/security/TokenManager');
@@ -49,6 +52,23 @@ container.register([
   {
     key: UserRepository.name,
     Class: UserRepositoryPostgres,
+    parameter: {
+      dependencies: [
+        {
+          concrete: pool,
+        },
+        {
+          concrete: nanoid
+        },
+        {
+          concrete: dayjs
+        }
+      ]
+    }
+  },
+  {
+    key: ParentalPraiseRepository.name,
+    Class: ParentalPraiseRepositoryPostgres,
     parameter: {
       dependencies: [
         {
@@ -220,7 +240,24 @@ container.register([
         },
       ]
     }
-  }
+  },
+  {
+    key: ParentalPraiseUseCase.name,
+    Class: ParentalPraiseUseCase,
+    parameter: {
+      injectType: 'destructuring',
+      dependencies: [
+        {
+          name: 'parentalPraiseRepository',
+          internal: ParentalPraiseRepository.name,
+        },
+        {
+          name: 'userRepository',
+          internal: UserRepository.name,
+        },
+      ]
+    }
+  },
 ]);
 
 module.exports = container;
