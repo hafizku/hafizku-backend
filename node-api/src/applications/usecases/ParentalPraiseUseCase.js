@@ -9,6 +9,7 @@ class ParentalPraiseUseCase {
 
   async addParentalPraise(verseMemoId, parentId, childId, useCasePayload) {
 
+
     const addParentalPraise = new AddParentalPraise(useCasePayload);
 
     const data = await this._parentalPraiseRepository.addParentalPraise(verseMemoId, parentId, childId, addParentalPraise);
@@ -29,8 +30,8 @@ class ParentalPraiseUseCase {
 
 
 
-  async getParentalPraise(verseMemoId, parentId, childId) {
-    return this._parentalPraiseRepository.getParentalPraise(verseMemoId, parentId, childId);
+  async getParentalPraise(verseMemoId, childId) {
+    return this._parentalPraiseRepository.getParentalPraise(verseMemoId, childId);
   }
 
 

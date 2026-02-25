@@ -20,7 +20,7 @@ class LoggedUser {
       throw new Error('NOT_CONTAIN_NEEDED_PROPERTY');
     }
 
-    if (typeof username !== 'string' || typeof email !== 'string' || typeof id !== 'string' || typeof name !== 'string' || typeof role !== 'string' || typeof status !== 'string' || typeof avatar != 'string' || typeof accessToken !== 'string') {
+    if (typeof id !== 'string' || typeof name !== 'string' || typeof role !== 'string' || typeof status !== 'string' || typeof avatar != 'string' || typeof accessToken !== 'string') {
       throw new Error('NOT_MEET_DATA_TYPE_SPECIFICATION');
     }
   }

@@ -127,6 +127,8 @@ class VerseMemorizationUseCase {
     const idMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.id]));
     const statusMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.status]));
     const audioMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.audio]));
+    const thresholdMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.threshold]));
+    const wordsMap = new Map(verseHistory.map(p => [`${p.surah}:${p.verse}`, p.words]));
 
     let totalMemorizedVerse = 0;
 
@@ -134,6 +136,8 @@ class VerseMemorizationUseCase {
       const score = progressMap.get(verse.key) || 0;
       const verseId = idMap.get(verse.key) || null;
       const audio = audioMap.get(verse.key) || '-';
+      const threshold = thresholdMap.get(verse.key) || null;
+      const words = wordsMap.get(verse.key) || null;
       const statusVerse = statusMap.get(verse.key) || 'new';
 
       const chapterId = verse.key.split(":")[0];
@@ -143,6 +147,12 @@ class VerseMemorizationUseCase {
         totalMemorizedVerse++;
       }
 
+      let wordsData = words;
+
+      if (!Array.isArray(wordsData)) {
+        wordsData = [];
+      }
+
       return {
         ...verse,
         chapter: chapter.name_simple,
@@ -150,7 +160,9 @@ class VerseMemorizationUseCase {
           id: verseId,
           status: statusVerse,
           audio: audio,
+          threshold: threshold,
           score: parseInt(score),
+          words: wordsData
         }
       };
     });
@@ -383,17 +395,15 @@ class VerseMemorizationUseCase {
   async getChildSummary(parentId) {
     const childs = await this._userRepository.getListChild(parentId);
 
-
-
     const childPromises = childs.map(async (child) => {
 
-      // Di sini Anda BISA panggil function await apa pun
+      const scoreData = await this._userRepository.getScoreChild(child.id);
       const memoData = await this.getJuzMemorization(child.id);
 
 
-      // Pastikan Anda mengembalikan (return) object yang sudah lengkap
       return {
         ...child,
+        total_score: scoreData,
         memorized_juz: memoData.memorized_juz,
         memorized_verse: memoData.memorized_verse,
         total_verse: memoData.total_verse,

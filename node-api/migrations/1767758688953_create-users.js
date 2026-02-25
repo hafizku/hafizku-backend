@@ -10,12 +10,10 @@ exports.up = (pgm) => {
     },
     username: {
       type: 'TEXT',
-      notNull: true,
       unique: true,
     },
     email: {
       type: 'TEXT',
-      notNull: true,
       unique: true,
     },
     password: {

@@ -13,17 +13,22 @@ class ParentalPraiseRepositoryPostgres extends ParentalPraiseRepository {
 
   async addParentalPraise(verseMemoId, parentId, childId, addParentalPraise) {
     const { praise, voice } = addParentalPraise;
+    console.log(voice);
     const id = `parentalpraise-${this._idGenerator()}`;
     const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
     const query = {
-      text: 'INSERT INTO parental_praise VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+      text: 'INSERT INTO parental_praise VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, praise, updated',
       values: [id, verseMemoId, parentId, childId, praise, voice, date, date]
     };
 
     const result = await this._pool.query(query);
 
+
+
     return result.rows[0];
+
+
   }
 
 
@@ -53,14 +58,14 @@ class ParentalPraiseRepositoryPostgres extends ParentalPraiseRepository {
   }
 
 
-  async getParentalPraise(verseMemoId, parentId, childId) {
+  async getParentalPraise(verseMemoId, childId) {
     const query = {
-      text: "SELECT id, praise, voice, created, updated FROM parental_praise WHERE versememorization_id = $1 AND parent_id = $2 AND child_id = $3",
-      values: [verseMemoId, parentId, childId]
+      text: "SELECT id, praise, voice, created, updated FROM parental_praise WHERE versememorization_id = $1 AND child_id = $2",
+      values: [verseMemoId, childId]
     };
 
     const result = await this._pool.query(query);
-    return result.rows;
+    return result.rows[0];
   }
 }
 

@@ -8,6 +8,7 @@ class RegisterUseCase {
 
   async execute(useCasePayload) {
     const registerUser = new RegisterUser(useCasePayload);
+
     if (registerUser.role == 'child') {
       await this._userRepository.verifyAvailableUsername(registerUser.username);
       await this._userRepository.verifyAvailablePhone(registerUser.phone);

@@ -70,6 +70,9 @@ class UserRepositoryPostgres extends UserRepository {
 
   async addUser(registerUser) {
     const { username, email, password, name, role, phone, token } = registerUser;
+
+    let queryData;
+
     const id = `user-${this._idGenerator()}`;
     let roleData = role;
     if (token != null && token != '-' && token == process.env.ADMIN_TOKEN) {
@@ -83,12 +86,19 @@ class UserRepositoryPostgres extends UserRepository {
     }
     const date = this._dayjs().tz().format('DD/MM/YYYY HH:mm:ss');
 
-    const query = {
-      text: 'INSERT INTO users VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      values: [id, username, email, password, name, phone, '-', 'free', roleData, tokenParent, date, date]
-    };
+    if (username == '-') {
+      queryData = {
+        text: 'INSERT INTO users (id, email, password, name, phone, avatar, status, role, token, created, updated) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+        values: [id, email, password, name, phone, '-', 'free', roleData, tokenParent, date, date]
+      }
+    } else {
+      queryData = {
+        text: 'INSERT INTO users (id, username, password, name, phone, avatar, status, role, token, created, updated) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+        values: [id, username, password, name, phone, '-', 'free', roleData, tokenParent, date, date]
+      }
+    }
 
-    return this._pool.query(query);
+    return this._pool.query(queryData);
   }
 
   async editUser(userId, editUser) {
@@ -262,19 +272,30 @@ class UserRepositoryPostgres extends UserRepository {
     const result = await this._pool.query(query);
 
     if (!result.rowCount) {
-      throw new AuthorizationError('Akses ditolak');
+      throw new NotFoundError('Belum ada akun anak yang terhubung');
     }
   }
 
   async getListChild(parentId) {
     const query = {
-      text: "SELECT u.id, u.name, u.avatar, ROUND(AVG(CAST(NULLIF(regexp_replace(vm.score, '[^0-9.]', '', 'g'), '') AS NUMERIC)), 0) AS total_score FROM users u JOIN parentchilds pc ON u.id = pc.child_id JOIN versememorizations vm ON vm.user_id = u.id WHERE vm.status = 'memorized' AND pc.parent_id = $1 GROUP BY u.id, u.name",
+      text: "SELECT u.id, u.name, u.avatar FROM users u JOIN parentchilds pc ON u.id = pc.child_id WHERE pc.parent_id = $1 GROUP BY u.id, u.name",
       values: [parentId]
     };
 
     const result = await this._pool.query(query);
 
     return result.rows;
+  }
+
+  async getScoreChild(childId) {
+    const query = {
+      text: "SELECT ROUND(AVG(CAST(NULLIF(regexp_replace(vm.score, '[^0-9.]', '', 'g'), '') AS NUMERIC)), 0) AS total_score FROM users u JOIN parentchilds pc ON u.id = pc.child_id JOIN versememorizations vm ON vm.user_id = u.id WHERE vm.status = 'memorized' AND pc.child_id = $1",
+      values: [childId]
+    };
+
+    const result = await this._pool.query(query);
+
+    return result.rows[0].total_score;
   }
 
 

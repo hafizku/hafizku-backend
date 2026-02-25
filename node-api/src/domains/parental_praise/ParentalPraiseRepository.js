@@ -11,7 +11,7 @@ class ParentalPraiserRepository {
     throw new Error('PARENTAL_PRAISE_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 
-  async getParentalPraise(verseMemoId, parentId, childId) {
+  async getParentalPraise(verseMemoId, childId) {
     throw new Error('PARENTAL_PRAISE_REPOSITORY.METHOD_NOT_IMPLEMENTED');
   }
 

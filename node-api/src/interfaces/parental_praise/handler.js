@@ -47,7 +47,7 @@ class ParentalPraiseHandler {
     const parentalPraiseUseCase = this._container.getInstance(ParentalPraiseUseCase.name);
     const { id: credentialId } = request.auth.credentials;
     const { verseMemoId, childId } = request.params;
-    const data = await parentalPraiseUseCase.getParentalPraise(verseMemoId, credentialId, childId);
+    const data = await parentalPraiseUseCase.getParentalPraise(verseMemoId, childId);
 
     const response = h.response({
       status: 'success',

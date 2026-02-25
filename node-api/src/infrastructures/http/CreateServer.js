@@ -2,6 +2,7 @@ const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
 const users = require('../../interfaces/users');
 const versememorizations = require('../../interfaces/verse_memorizations');
+const parentalpraise = require('../../interfaces/parental_praise');
 
 const config = require('../../commons/config');
 const DomainErrorTranslator = require('../../commons/exceptions/DomainErrorTranslator');
@@ -50,6 +51,10 @@ const createServer = async (container) => {
     },
     {
       plugin: versememorizations,
+      options: { container }
+    },
+    {
+      plugin: parentalpraise,
       options: { container }
     },
   ]);
